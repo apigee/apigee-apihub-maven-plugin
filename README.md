@@ -16,6 +16,3 @@ The [samples folder](./samples) provides a README with Getting Started steps and
 * Please send feature requests using [issues](https://github.com/apigee/apigee-apihub-maven-plugin/issues)
 * Post a question in [Apigee community](https://community.apigee.com/index.html)
 * Create an [issue](https://github.com/apigee/apigee-apihub-maven-plugin/issues/new)
-
-## Note
-* `apiartifact` goal does not support `create` and `update` options
