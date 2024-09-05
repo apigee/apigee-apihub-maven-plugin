@@ -1,0 +1,39 @@
+[
+   {
+      "name":"externalApi1",
+      "displayName":"externalApi1",
+      "description":"External API 1",
+      "endpoints":[
+         "https://api.externalapi.com"
+      ],
+      "paths":[
+         "/v1/foo"
+      ],
+      "documentation":{
+         "externalUri":"https://api-docs.externalapi.com"
+      },
+      "attributes":{
+         "sample-attribute6":{
+            "stringValues":{
+               "values":[
+                  "extValue"
+               ]
+            }
+         }
+      }
+   },
+   {
+      "name":"externalApi2",
+      "displayName":"externalApi2",
+      "description":"External API 2",
+      "endpoints":[
+         "https://api2.externalapi.com"
+      ],
+      "paths":[
+         "/v2/foo"
+      ],
+      "documentation":{
+         "externalUri":"https://api-docs.externalapi.com"
+      }
+   }
+]

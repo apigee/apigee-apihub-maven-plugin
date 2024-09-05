@@ -1,0 +1,62 @@
+[
+	{
+	    "name": "sample-attribute1",
+	    "displayName": "sample-attribute1",
+	    "description": "Sample Attribute 1",
+	    "scope": "VERSION",
+	    "dataType": "ENUM",
+	    "allowedValues": [
+	        {
+	            "id": "foo0",
+	            "displayName": "foo",
+	            "description": "bar"
+	        },
+	        {
+	            "id": "url0",
+	            "displayName": "url",
+	            "description": "https://google.com"
+	        }
+	    ],
+	    "cardinality": 1,
+	},
+	{
+	    "name": "sample-attribute2",
+	    "displayName": "sample-attribute2",
+	    "description": "Sample Attribute 2",
+	    "scope": "SPEC",
+	    "dataType": "JSON",
+	    "cardinality": 1
+	},
+	{
+	    "name": "sample-attribute3",
+	    "displayName": "sample-attribute3",
+	    "description": "Sample Attribute 3",
+	    "scope": "DEPLOYMENT",
+	    "dataType": "STRING",
+	    "cardinality": 1
+	},
+	{
+	    "name": "sample-attribute4",
+	    "displayName": "sample-attribute4",
+	    "description": "Sample Attribute 4",
+	    "scope": "DEPLOYMENT",
+	    "dataType": "STRING",
+	    "cardinality": 1
+	},
+	{
+	    "name": "sample-attribute5",
+	    "displayName": "sample-attribute5",
+	    "description": "Sample Attribute 5",
+	    "scope": "DEPENDENCY",
+	    "dataType": "JSON",
+	    "cardinality": 1
+	},
+	{
+	    "name": "sample-attribute6",
+	    "displayName": "sample-attribute6",
+	    "description": "Sample Attribute 6",
+	    "scope": "EXTERNAL_API",
+	    "dataType": "STRING",
+	    "cardinality": 1
+	}
+]
