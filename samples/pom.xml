@@ -58,6 +58,41 @@
 							<goal>externalapis</goal>
 						</goals>
 					</execution>
+					<execution>
+						<id>apigee-apihub-dependencies</id>
+						<phase>install</phase>
+						<goals>
+							<goal>dependencies</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>apigee-apihub-deployments</id>
+						<phase>install</phase>
+						<goals>
+							<goal>deployments</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>apigee-apihub-apis</id>
+						<phase>install</phase>
+						<goals>
+							<goal>apis</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>apigee-apihub-apiversions</id>
+						<phase>install</phase>
+						<goals>
+							<goal>apiversions</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>apigee-apihub-specs</id>
+						<phase>install</phase>
+						<goals>
+							<goal>specs</goal>
+						</goals>
+					</execution>
 				</executions>
 			</plugin>
 		</plugins>

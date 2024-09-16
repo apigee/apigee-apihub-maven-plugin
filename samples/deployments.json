@@ -1,0 +1,87 @@
+[
+   {
+      "name":"deployment1",
+      "displayName":"Deployment 1",
+      "description":"Deployment 1",
+      "documentation":{
+         "externalUri":"https://api-test.docs.example.com"
+      },
+      "deploymentType": {
+        "attribute": "system-deployment-type",
+        "enumValues": {
+            "values": [
+                {
+                    "id": "apigee-hybrid"
+                }
+            ]
+        }
+      },
+      "resourceUri":"https://api-test.example.com",
+      "endpoints":[
+         "https://foo.com",
+         "https://bar.com"
+      ],
+      "slo": {
+        "attribute": "system-slo",
+        "enumValues": {
+            "values": [
+                {
+                    "id":"99-95"
+                }
+            ]
+        }
+      },
+      "environment": {
+        "attribute": "system-environment",
+        "enumValues": {
+            "values": [
+                {
+                    "id":"test"
+                }
+            ]
+        }
+      },
+      "attributes":{
+         "sample-attribute3":{
+            "stringValues":{
+               "values":[
+                  "Test"
+               ]
+            }
+         }
+      }
+   },
+   {
+      "name":"deployment2",
+      "displayName":"Deployment 2",
+      "description":"Deployment 2",
+      "documentation":{
+         "externalUri":"https://api-staging.docs.example.com"
+      },
+      "deploymentType": {
+        "attribute": "system-deployment-type",
+        "enumValues": {
+            "values": [
+                {
+                    "id": "apigee"
+                }
+            ]
+        }
+      },
+      "environment": {
+        "attribute": "system-environment",
+        "enumValues": {
+            "values": [
+                {
+                    "id":"staging"
+                }
+            ]
+        }
+      },
+      "resourceUri":"https://api-staging.example.com",
+      "endpoints":[
+         "https://foo.com",
+         "https://bar.com"
+      ]
+   }
+]

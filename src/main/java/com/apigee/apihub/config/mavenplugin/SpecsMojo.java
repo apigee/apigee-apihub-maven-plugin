@@ -21,6 +21,8 @@ import static java.lang.String.format;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -37,21 +39,20 @@ import com.google.api.client.util.Key;
 import com.google.api.gax.rpc.ApiException;
 import com.google.api.gax.rpc.StatusCode.Code;
 import com.google.cloud.apihub.v1.ApiHubClient;
-import com.google.cloud.apihub.v1.ExternalApiName;
-import com.google.cloud.apihub.v1.LocationName;
+import com.google.cloud.apihub.v1.VersionName;
 import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
 import com.google.protobuf.FieldMask;
 
 /**
- * Goal to configure External APIs in Apigee API Hub
+ * Goal to configure Spec in Apigee API Hub
  *
  * @author ssvaidyanathan
- * @goal externalapis
+ * @goal specs
  * @phase install
  */
-public class ExternalApisMojo extends ApiHubAbstractMojo {
-	static Logger logger = LogManager.getLogger(ExternalApisMojo.class);
+public class SpecsMojo extends ApiHubAbstractMojo {
+	static Logger logger = LogManager.getLogger(SpecsMojo.class);
 
 	public static final String ____ATTENTION_MARKER____ = "************************************************************************";
 
@@ -66,22 +67,22 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	/**
 	 * Constructor.
 	 */
-	public ExternalApisMojo() {
+	public SpecsMojo() {
 		super();
 	}
 	
 	
-	public static class ExternalApi {
+	public static class Spec {
         @Key
         public String name;
     }
 	
-	protected String getExternalApiName(String payload) 
+	protected String getSpecName(String payload) 
             throws MojoFailureException {
 		Gson gson = new Gson();
 		try {
-			ExternalApi externalApi = gson.fromJson(payload, ExternalApi.class);
-			return externalApi.name;
+			Spec spec = gson.fromJson(payload, Spec.class);
+			return spec.name;
 		} catch (JsonParseException e) {
 		  throw new MojoFailureException(e.getMessage());
 		}
@@ -95,7 +96,7 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	public void init() throws MojoExecutionException, MojoFailureException {
 		try {
 			logger.info(____ATTENTION_MARKER____);
-			logger.info("API Hub External API");
+			logger.info("API Hub Specs");
 			logger.info(____ATTENTION_MARKER____);
 
 			String options = "";
@@ -106,7 +107,7 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 				buildOption = OPTIONS.valueOf(options);
 			}
 			if (buildOption == OPTIONS.none) {
-				logger.info("Skipping External API (default action)");
+				logger.info("Skipping Spec (default action)");
 				return;
 			}
 
@@ -146,9 +147,9 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 
 		try {
 			init();
-			logger.info(format("Fetching externalApis.json file from %s directory", buildProfile.getConfigDir()));
-			List<String> externalApis = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/externalApis.json");
-			processExternalApis(externalApis);
+			logger.info(format("Fetching specs.json file from %s directory", buildProfile.getConfigDir()));
+			List<String> specs = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/specs.json");
+			processSpecs(specs);
 
 		} catch (MojoFailureException e) {
 			throw e;
@@ -163,10 +164,10 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 
 	/**
 	 * 
-	 * @param externalApis
+	 * @param specs
 	 * @throws MojoExecutionException
 	 */
-	public void processExternalApis(List<String> externalApis) throws MojoExecutionException {
+	public void processSpecs(List<String> specs) throws MojoExecutionException {
 		try {
 			if (buildOption != OPTIONS.update && 
 					buildOption != OPTIONS.create &&
@@ -174,33 +175,39 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	                buildOption != OPTIONS.sync) {
 					return;
 			}
-			for (String externalApi : externalApis) {
-				String externalApiName = getExternalApiName(externalApi);
-				if (externalApiName == null) {
-	        		throw new IllegalArgumentException("External API does not have a name");
+			for (String spec : specs) {
+				String specName = getSpecName(spec);
+				String pattern = "^([a-zA-Z0-9-_]+)\\/versions\\/([a-zA-Z0-9-_]+)\\/specs\\/([a-zA-Z0-9-_]+)$"; //{api}/versions/{version}/specs/{spec}
+				Pattern p = Pattern.compile(pattern);
+				Matcher m = p.matcher(specName);
+				if (specName == null) {
+	        		throw new IllegalArgumentException("Spec does not have a name");
 	        	}
-				if (doesExternalApiExist(buildProfile, externalApiName)) {
+				else if(specName != null && !m.matches()) {
+					throw new IllegalArgumentException(format("Spec should be in %s format", pattern));
+				}
+				if (doesSpecExist(buildProfile, specName)) {
 					switch (buildOption) {
 						case create:
-							logger.info(format("External API \"%s\" already exists. Skipping.", externalApiName));
+							logger.info(format("Spec \"%s\" already exists. Skipping.", specName));
 							break;
 						case update:
-							logger.info(format("External API \"%s\" already exists. Updating.", externalApiName));
+							logger.info(format("Spec \"%s\" already exists. Updating.", specName));
 							//update
-							doUpdate(buildProfile, externalApiName, externalApi);
+							doUpdate(buildProfile, specName, spec);
 							break;
 						case delete:
-							logger.info(format("External API \"%s\" already exists. Deleting.", externalApiName));
+							logger.info(format("Spec \"%s\" already exists. Deleting.", specName));
 							//delete
-							doDelete(buildProfile, externalApiName);
+							doDelete(buildProfile, specName);
 							break;
 						case sync:
-							logger.info(format("External API \"%s\" already exists. Deleting and recreating.", externalApiName));
+							logger.info(format("Spec \"%s\" already exists. Deleting and recreating.", specName));
 							//delete
-							doDelete(buildProfile, externalApiName);
-							logger.info(format("Creating External API - %s", externalApiName));
+							doDelete(buildProfile, specName);
+							logger.info(format("Creating Spec - %s", specName));
 							//create
-							doCreate(buildProfile, externalApiName, externalApi);
+							doCreate(buildProfile, specName, spec);
 							break;
 					}
 				} else {
@@ -208,12 +215,12 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 						case create:
 	                    case sync:
 	                    case update:
-	                    	logger.info(format("Creating External API - %s", externalApiName));
+	                    	logger.info(format("Creating Spec - %s", specName));
 	                    	//create
-	                    	doCreate(buildProfile, externalApiName, externalApi);
+	                    	doCreate(buildProfile, specName, spec);
 							break;
 	                    case delete:
-                            logger.info(format("External API \"%s\" does not exist. Skipping.", externalApiName));
+                            logger.info(format("Spec \"%s\" does not exist. Skipping.", specName));
                             break;
 					}
 				}
@@ -224,23 +231,42 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	}
 	
 	/**
-	 * Create External API
-	 * @param externalApiName
-	 * @param externalApiStr
+	 * Create Spec
+	 * @param specName
+	 * @param specStr
 	 * @throws MojoExecutionException
 	 */
-	public void doCreate(BuildProfile profile, String externalApiName, String externalApiStr) throws MojoExecutionException {
+	public void doCreate(BuildProfile profile, String specName, String specStr) throws MojoExecutionException {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-			LocationName parent = LocationName.of(profile.getProjectId(), profile.getLocation());
 			
-			//update attributes with FQDN if exist
-			externalApiStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", externalApiStr);
+			//parse the {api}/versions/{version}/specs/{spec}
+			String pattern = "^([a-zA-Z0-9-_]+)\\/versions\\/([a-zA-Z0-9-_]+)\\/specs\\/([a-zA-Z0-9-_]+)$"; //{api}/versions/{version}/specs/{spec}
+			Pattern p = Pattern.compile(pattern);
+			Matcher m = p.matcher(specName);
+			if(m.matches()) {
+				String apiName = m.group(1);
+				String version = m.group(2);
+				String specId = m.group(3);
+				
+				VersionName parent = VersionName.of(profile.getProjectId(), profile.getLocation(), apiName, version);
+				
+				//replace the name field from {api}/versions/{version}/specs/{spec} to {spec}
+				specStr = FQDNHelper.replaceFQDNJsonValue("$.name", specId, specStr);
+				
+				//update attributes with FQDN if exist
+				specStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", specStr);
+				
+				//update specType with FQDN if exist
+				specStr = FQDNHelper.updateFQDNJsonValue("$.specType.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),specStr);
 			
-			com.google.cloud.apihub.v1.ExternalApi externalApipObj = ProtoJsonUtil.fromJson(externalApiStr, com.google.cloud.apihub.v1.ExternalApi.class);
-		    apiHubClient.createExternalApi(parent, externalApipObj, externalApiName);
-		    logger.info("Create success");
+				
+				com.google.cloud.apihub.v1.Spec specObj = ProtoJsonUtil.fromJson(specStr, com.google.cloud.apihub.v1.Spec.class);
+				apiHubClient.createSpec(parent, specObj, specId);
+			    logger.info("Create success");
+				
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 			throw new RuntimeException("Create failure: " + e.getMessage());
@@ -248,17 +274,16 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	}
 
 	/**
-	 * Delete External API
+	 * Delete Spec
 	 * @param profile
-	 * @param externalApiName
+	 * @param specName
 	 * @throws MojoExecutionException
 	 */
-	public void doDelete(BuildProfile profile, String externalApiName) throws MojoExecutionException {
+	public void doDelete(BuildProfile profile, String specName) throws MojoExecutionException {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-			ExternalApiName name = ExternalApiName.of(profile.getProjectId(), profile.getLocation(), externalApiName);
-		    apiHubClient.deleteExternalApi(name);
+			apiHubClient.deleteSpec(format("projects/%s/locations/%s/apis/%s", profile.getProjectId(), profile.getLocation(), specName));
 		    logger.info("Delete success");
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -267,35 +292,42 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	}
 	
 	/**
-	 * Update External API
+	 * Update Spec
 	 * @param profile
-	 * @param externalApiName
-	 * @param externalApiStr
+	 * @param specName
+	 * @param specStr
 	 * @throws MojoExecutionException
 	 */
-	public void doUpdate(BuildProfile profile, String externalApiName, String externalApiStr) throws MojoExecutionException {
+	public void doUpdate(BuildProfile profile, String specName, String specStr) throws MojoExecutionException {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
 			
-			//updating the name field in the attribute object to projects/{project}/locations/{location}/attributes/{attribute} format as its required by the updateAttribute method
-			externalApiStr = FQDNHelper.updateFQDNJsonValue("$.name", 
-															format("projects/%s/locations/%s/externalApis", profile.getProjectId(), profile.getLocation()), 
-															externalApiStr);
+			//updating the name field in the spec object to projects/{project}/locations/{location}/apis/{api}/versions/{version}/specs/{spec} format as its required by the updateSpec method
+			specStr = FQDNHelper.updateFQDNJsonValue("$.name", 
+											format("projects/%s/locations/%s/apis", profile.getProjectId(), profile.getLocation()), 
+											specStr);
 			
 			//update attributes with FQDN if exist
-			externalApiStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", externalApiStr);
+			specStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", specStr);
+
+			//update specType with FQDN if exist
+			specStr = FQDNHelper.updateFQDNJsonValue("$.specType.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),specStr);
+		
+			logger.debug("after modifying: "+ specStr);
 			
-			
-			com.google.cloud.apihub.v1.ExternalApi externalApiObj = ProtoJsonUtil.fromJson(externalApiStr, com.google.cloud.apihub.v1.ExternalApi.class);
+			com.google.cloud.apihub.v1.Spec specObj = ProtoJsonUtil.fromJson(specStr, com.google.cloud.apihub.v1.Spec.class);
 			List<String> fieldMaskValues = new ArrayList<>();
 			fieldMaskValues.add("display_name");
-			fieldMaskValues.add("description");
-			fieldMaskValues.add("documentation");
-	        fieldMaskValues.add("endpoints");
-	        fieldMaskValues.add("paths");
+			if(FQDNHelper.checkIfJsonElementExist("$.sourceUri", specStr))
+				fieldMaskValues.add("source_uri");
+			fieldMaskValues.add("lint_response");			
+			fieldMaskValues.add("attributes");
+			if(FQDNHelper.checkIfJsonElementExist("$.contents", specStr))
+				fieldMaskValues.add("contents");
+			fieldMaskValues.add("spec_type");;
 			FieldMask updateMask = FieldMask.newBuilder().addAllPaths(fieldMaskValues).build();
-		    apiHubClient.updateExternalApi(externalApiObj, updateMask);
+			apiHubClient.updateSpec(specObj, updateMask);
 		    logger.info("Update success");
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -304,21 +336,20 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	}
 	
 	/**
-	 * Check if an external API exist
+	 * Check if Spec exist
 	 *  
 	 * @param profile
-	 * @param externalApiName
+	 * @param specName
 	 * @return
 	 * @throws IOException
 	 */
-	public static boolean doesExternalApiExist(BuildProfile profile, String externalApiName)
+	public static boolean doesSpecExist(BuildProfile profile, String specName)
 	            throws IOException {
 		try {
-        	logger.info("Checking if External API - " +externalApiName + " exist");
+        	logger.info("Checking if Spec - " +specName + " exist");
         	ApiHubClient apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-        	ExternalApiName name = ExternalApiName.of(profile.getProjectId(), profile.getLocation(), externalApiName);
-        	com.google.cloud.apihub.v1.ExternalApi externalApiResponse = apiHubClient.getExternalApi(name);
-        	if(externalApiResponse == null) 
+        	com.google.cloud.apihub.v1.Spec specResponse = apiHubClient.getSpec(format("projects/%s/locations/%s/apis/%s", profile.getProjectId(), profile.getLocation(), specName));
+        	if(specResponse == null) 
             	return false;
         }
         catch (ApiException e) {

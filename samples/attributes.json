@@ -58,5 +58,57 @@
 	    "scope": "EXTERNAL_API",
 	    "dataType": "STRING",
 	    "cardinality": 1
+	},
+	{
+	    "name": "sample-attribute7",
+	    "displayName": "sample-attribute7",
+	    "description": "Sample Attribute 7",
+	    "scope": "EXTERNAL_API",
+	    "dataType": "STRING",
+	    "cardinality": 1
+	},
+	{
+	    "name": "sample-attribute8",
+	    "displayName": "sample-attribute8",
+	    "description": "Sample Attribute 8",
+	    "scope": "DEPENDENCY",
+	    "dataType": "STRING",
+	    "cardinality": 1
+	},
+	{
+	    "name": "sample-attribute9",
+	    "displayName": "sample-attribute9",
+	    "description": "Sample Attribute 9",
+	    "scope": "DEPENDENCY",
+	    "dataType": "STRING",
+	    "cardinality": 1
+	},
+	{
+	    "name": "sample-attribute10",
+	    "displayName": "sample-attribute10",
+	    "description": "Sample Attribute 10",
+	    "scope": "API",
+	    "dataType": "STRING",
+	    "cardinality": 1
+	},
+	{
+	    "name": "sample-attribute11",
+	    "displayName": "sample-attribute11",
+	    "description": "Sample Attribute 11",
+	    "scope": "EXTERNAL_API",
+	    "dataType": "ENUM",
+	    "allowedValues": [
+	        {
+	            "id": "foo0",
+	            "displayName": "foo",
+	            "description": "bar"
+	        },
+	        {
+	            "id": "url0",
+	            "displayName": "url",
+	            "description": "https://google.com"
+	        }
+	    ],
+	    "cardinality": 1
 	}
 ]

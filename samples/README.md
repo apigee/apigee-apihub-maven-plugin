@@ -8,17 +8,17 @@ mvn install -P{profile} -DprojectId=${project} -Dfile={path}
 
   -P<profile>
     Pick a profile in the pom.xml.
-    Apigee APi Hub location, config file, option are picked from the profile.
+    Apigee API Hub location, config directory, option are picked from the profile.
 
   -Dapigee.apihub.config.options
     none   - No action (default)
-    create - Creates the API in the Apigee API Hub
-    update - Updates the API in the Apigee API Hub
-    delete - Deletes the API in the Apigee API Hub
-    sync   - executes delete and update options mentioned above
+    create - Create when not found. Pre-existing config is NOT updated even if it is different.
+    update - Update when found; create when not found
+    delete - Delete when found
+    sync   - Delete and recreate.
     
-  -Dfile
-  	path to the service account key file that has the appropriate Apigee API Hub permissions
+  -Dapigee.apihub.config.dir
+  	path to the directory containing the configuration
   
   -Dbearer
   	access token. Service Account file takes precedence
@@ -34,7 +34,7 @@ mvn install -P{profile} -DprojectId=${project} -Dfile={path}
 
 ## API Configuration
 
-- Check out the samples that includes the structure of the API, specs, deployment and artifact objects needed to push an API to the API Hub
+- Check out the samples that includes the structure of the API, specs, deployment and other config objects needed to push an API to the API Hub
 
 
 ### Basic Implementation

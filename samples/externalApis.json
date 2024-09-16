@@ -19,6 +19,13 @@
                   "extValue"
                ]
             }
+         },
+         "sample-attribute7":{
+            "stringValues":{
+               "values":[
+                  "extValue"
+               ]
+            }
          }
       }
    },

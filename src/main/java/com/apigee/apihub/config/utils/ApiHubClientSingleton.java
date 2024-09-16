@@ -25,6 +25,8 @@ import com.google.api.gax.core.FixedCredentialsProvider;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.apihub.v1.ApiHubClient;
+import com.google.cloud.apihub.v1.ApiHubDependenciesClient;
+import com.google.cloud.apihub.v1.ApiHubDependenciesSettings;
 import com.google.cloud.apihub.v1.ApiHubSettings;
 
 public class ApiHubClientSingleton {
@@ -33,18 +35,13 @@ public class ApiHubClientSingleton {
 	
 	// Static variable reference of apiHubClient of type ApiHubClientSingleton
 	private static ApiHubClientSingleton apiHubClientObj = null;
+	// Static variable reference of apiHubClient of type ApiHubClientSingleton
+	private static ApiHubClientSingleton apiHubDependenciesClientObj = null;
 	
 	private ApiHubClient apiHubClient;
-	
-	public void setApiHubClient(ApiHubClient apiHubClient) {
-		this.apiHubClient = apiHubClient;
-	}
-	
-	public ApiHubClient getApiHubClient() {
-		return apiHubClient;
-	}
+	private ApiHubDependenciesClient apiHubDependenciesClient;
 
-	private ApiHubClientSingleton(BuildProfile profile) throws Exception {
+	private ApiHubClientSingleton(BuildProfile profile, String clientType) throws Exception {
 		GoogleCredentials credentials = null;
 		try {
 			if(profile.getServiceAccountFilePath() == null && profile.getBearer() == null) {
@@ -59,20 +56,55 @@ public class ApiHubClientSingleton {
 				logger.info("Using the bearer token");
 				credentials = GoogleCredentials.newBuilder().setAccessToken(new AccessToken(profile.getBearer(), null)).build();
 			}
-			ApiHubSettings hubSettings = ApiHubSettings.newHttpJsonBuilder()
-					.setCredentialsProvider(FixedCredentialsProvider.create(credentials)).build();
-			setApiHubClient(ApiHubClient.create(hubSettings));
+			//apihub
+			if(clientType!=null && clientType.equals("apis")) {
+				ApiHubSettings hubSettings = ApiHubSettings.newHttpJsonBuilder()
+						.setCredentialsProvider(FixedCredentialsProvider.create(credentials)).build();
+				setApiHubClient(ApiHubClient.create(hubSettings));
+			}
+			//dependencies
+			if(clientType!=null && clientType.equals("dependencies")) {
+				ApiHubDependenciesSettings hubDependenciesSettings = ApiHubDependenciesSettings.newHttpJsonBuilder()
+						.setCredentialsProvider(FixedCredentialsProvider.create(credentials)).build();
+				setApiHubDependenciesClient(ApiHubDependenciesClient.create(hubDependenciesSettings));
+			}
+			
 		} catch (Exception e) {
 			throw e;
 		}
 	}
 	
-    // Static method to create instance of ApiHubClientSingleton class
+    // Static method to create instance of ApiHubClient class
     public static ApiHubClientSingleton getInstance(BuildProfile profile) throws Exception
     {
         if (apiHubClientObj == null)
-        	apiHubClientObj = new ApiHubClientSingleton(profile);
+        	apiHubClientObj = new ApiHubClientSingleton(profile, "apis");
  
         return apiHubClientObj;
     }
+    
+    // Static method to create instance of ApiHubDependenciesClient class
+    public static ApiHubClientSingleton getDependenciesInstance(BuildProfile profile) throws Exception
+    {
+        if (apiHubDependenciesClientObj == null)
+        	apiHubDependenciesClientObj = new ApiHubClientSingleton(profile, "dependencies");
+ 
+        return apiHubDependenciesClientObj;
+    }
+    
+    public void setApiHubClient(ApiHubClient apiHubClient) {
+		this.apiHubClient = apiHubClient;
+	}
+	
+	public ApiHubClient getApiHubClient() {
+		return apiHubClient;
+	}
+	
+	public void setApiHubDependenciesClient(ApiHubDependenciesClient apiHubDependenciesClient) {
+		this.apiHubDependenciesClient = apiHubDependenciesClient;
+	}
+	
+	public ApiHubDependenciesClient getApiHubDependenciesClient() {
+		return apiHubDependenciesClient;
+	}
 }

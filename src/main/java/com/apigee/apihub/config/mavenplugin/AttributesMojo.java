@@ -31,6 +31,7 @@ import org.json.simple.parser.ParseException;
 import com.apigee.apihub.config.utils.ApiHubClientSingleton;
 import com.apigee.apihub.config.utils.BuildProfile;
 import com.apigee.apihub.config.utils.ConfigReader;
+import com.apigee.apihub.config.utils.FQDNHelper;
 import com.apigee.apihub.config.utils.ProtoJsonUtil;
 import com.google.api.client.util.Key;
 import com.google.api.gax.rpc.ApiException;
@@ -105,7 +106,7 @@ public class AttributesMojo extends ApiHubAbstractMojo {
 				buildOption = OPTIONS.valueOf(options);
 			}
 			if (buildOption == OPTIONS.none) {
-				logger.info("Skipping Artifact (default action)");
+				logger.info("Skipping Attributes (default action)");
 				return;
 			}
 
@@ -272,9 +273,13 @@ public class AttributesMojo extends ApiHubAbstractMojo {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-			com.google.cloud.apihub.v1.Attribute attributeObj = ProtoJsonUtil.fromJson(attributeStr, com.google.cloud.apihub.v1.Attribute.class);
+			
 			//updating the name field in the attribute object to projects/{project}/locations/{location}/attributes/{attribute} format as its required by the updateAttribute method
-			attributeObj = attributeObj.toBuilder().setName(format("projects/%s/locations/%s/attributes/%s", profile.getProjectId(), profile.getLocation(), attributeName)).build();
+			attributeStr = FQDNHelper.updateFQDNJsonValue("$.name", 
+															format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()), 
+															attributeStr);
+			
+			com.google.cloud.apihub.v1.Attribute attributeObj = ProtoJsonUtil.fromJson(attributeStr, com.google.cloud.apihub.v1.Attribute.class);
 			List<String> fieldMaskValues = new ArrayList<>();
 			fieldMaskValues.add("display_name");
 			fieldMaskValues.add("description");

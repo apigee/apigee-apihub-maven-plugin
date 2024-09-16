@@ -1,0 +1,28 @@
+[
+	{
+	   "name":"dependency1",
+	   "description": "Dependency 1",
+	   "consumer":{
+	      "externalApiResourceName":"externalApis/externalApi1"
+	   },
+	   "supplier":{
+	      "externalApiResourceName":"externalApis/externalApi2"
+	   },
+	   "attributes":{
+	      "sample-attribute8":{
+	         "stringValues":{
+	            "values":[
+	               "dependency1"
+	            ]
+	         }
+	      },
+	      "sample-attribute9":{
+	         "stringValues":{
+	            "values":[
+	               "dependency2"
+	            ]
+	         }
+	      }
+	   }
+	}
+]

@@ -37,21 +37,21 @@ import com.google.api.client.util.Key;
 import com.google.api.gax.rpc.ApiException;
 import com.google.api.gax.rpc.StatusCode.Code;
 import com.google.cloud.apihub.v1.ApiHubClient;
-import com.google.cloud.apihub.v1.ExternalApiName;
+import com.google.cloud.apihub.v1.ApiName;
 import com.google.cloud.apihub.v1.LocationName;
 import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
 import com.google.protobuf.FieldMask;
 
 /**
- * Goal to configure External APIs in Apigee API Hub
+ * Goal to configure APIs in Apigee API Hub
  *
  * @author ssvaidyanathan
- * @goal externalapis
+ * @goal apis
  * @phase install
  */
-public class ExternalApisMojo extends ApiHubAbstractMojo {
-	static Logger logger = LogManager.getLogger(ExternalApisMojo.class);
+public class ApisMojo extends ApiHubAbstractMojo {
+	static Logger logger = LogManager.getLogger(ApisMojo.class);
 
 	public static final String ____ATTENTION_MARKER____ = "************************************************************************";
 
@@ -66,22 +66,22 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	/**
 	 * Constructor.
 	 */
-	public ExternalApisMojo() {
+	public ApisMojo() {
 		super();
 	}
 	
 	
-	public static class ExternalApi {
+	public static class Api {
         @Key
         public String name;
     }
 	
-	protected String getExternalApiName(String payload) 
+	protected String getApiName(String payload) 
             throws MojoFailureException {
 		Gson gson = new Gson();
 		try {
-			ExternalApi externalApi = gson.fromJson(payload, ExternalApi.class);
-			return externalApi.name;
+			Api api = gson.fromJson(payload, Api.class);
+			return api.name;
 		} catch (JsonParseException e) {
 		  throw new MojoFailureException(e.getMessage());
 		}
@@ -95,7 +95,7 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	public void init() throws MojoExecutionException, MojoFailureException {
 		try {
 			logger.info(____ATTENTION_MARKER____);
-			logger.info("API Hub External API");
+			logger.info("API Hub APIs");
 			logger.info(____ATTENTION_MARKER____);
 
 			String options = "";
@@ -106,7 +106,7 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 				buildOption = OPTIONS.valueOf(options);
 			}
 			if (buildOption == OPTIONS.none) {
-				logger.info("Skipping External API (default action)");
+				logger.info("Skipping APIs (default action)");
 				return;
 			}
 
@@ -146,9 +146,9 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 
 		try {
 			init();
-			logger.info(format("Fetching externalApis.json file from %s directory", buildProfile.getConfigDir()));
-			List<String> externalApis = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/externalApis.json");
-			processExternalApis(externalApis);
+			logger.info(format("Fetching apis.json file from %s directory", buildProfile.getConfigDir()));
+			List<String> apis = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/apis.json");
+			processApis(apis);
 
 		} catch (MojoFailureException e) {
 			throw e;
@@ -163,10 +163,10 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 
 	/**
 	 * 
-	 * @param externalApis
+	 * @param apis
 	 * @throws MojoExecutionException
 	 */
-	public void processExternalApis(List<String> externalApis) throws MojoExecutionException {
+	public void processApis(List<String> apis) throws MojoExecutionException {
 		try {
 			if (buildOption != OPTIONS.update && 
 					buildOption != OPTIONS.create &&
@@ -174,33 +174,33 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	                buildOption != OPTIONS.sync) {
 					return;
 			}
-			for (String externalApi : externalApis) {
-				String externalApiName = getExternalApiName(externalApi);
-				if (externalApiName == null) {
-	        		throw new IllegalArgumentException("External API does not have a name");
+			for (String api : apis) {
+				String apiName = getApiName(api);
+				if (apiName == null) {
+	        		throw new IllegalArgumentException("Api does not have a name");
 	        	}
-				if (doesExternalApiExist(buildProfile, externalApiName)) {
+				if (doesApiExist(buildProfile, apiName)) {
 					switch (buildOption) {
 						case create:
-							logger.info(format("External API \"%s\" already exists. Skipping.", externalApiName));
+							logger.info(format("Api \"%s\" already exists. Skipping.", apiName));
 							break;
 						case update:
-							logger.info(format("External API \"%s\" already exists. Updating.", externalApiName));
+							logger.info(format("Api \"%s\" already exists. Updating.", apiName));
 							//update
-							doUpdate(buildProfile, externalApiName, externalApi);
+							doUpdate(buildProfile, apiName, api);
 							break;
 						case delete:
-							logger.info(format("External API \"%s\" already exists. Deleting.", externalApiName));
+							logger.info(format("Api \"%s\" already exists. Deleting.", apiName));
 							//delete
-							doDelete(buildProfile, externalApiName);
+							doDelete(buildProfile, apiName);
 							break;
 						case sync:
-							logger.info(format("External API \"%s\" already exists. Deleting and recreating.", externalApiName));
+							logger.info(format("Api \"%s\" already exists. Deleting and recreating.", apiName));
 							//delete
-							doDelete(buildProfile, externalApiName);
-							logger.info(format("Creating External API - %s", externalApiName));
+							doDelete(buildProfile, apiName);
+							logger.info(format("Creating Api - %s", apiName));
 							//create
-							doCreate(buildProfile, externalApiName, externalApi);
+							doCreate(buildProfile, apiName, api);
 							break;
 					}
 				} else {
@@ -208,12 +208,12 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 						case create:
 	                    case sync:
 	                    case update:
-	                    	logger.info(format("Creating External API - %s", externalApiName));
+	                    	logger.info(format("Creating Api - %s", apiName));
 	                    	//create
-	                    	doCreate(buildProfile, externalApiName, externalApi);
+	                    	doCreate(buildProfile, apiName, api);
 							break;
 	                    case delete:
-                            logger.info(format("External API \"%s\" does not exist. Skipping.", externalApiName));
+                            logger.info(format("Api \"%s\" does not exist. Skipping.", apiName));
                             break;
 					}
 				}
@@ -224,22 +224,42 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	}
 	
 	/**
-	 * Create External API
-	 * @param externalApiName
-	 * @param externalApiStr
+	 * Create Api
+	 * @param apiName
+	 * @param apiStr
 	 * @throws MojoExecutionException
 	 */
-	public void doCreate(BuildProfile profile, String externalApiName, String externalApiStr) throws MojoExecutionException {
+	public void doCreate(BuildProfile profile, String apiName, String apiStr) throws MojoExecutionException {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
 			LocationName parent = LocationName.of(profile.getProjectId(), profile.getLocation());
 			
 			//update attributes with FQDN if exist
-			externalApiStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", externalApiStr);
+			apiStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", apiStr);
 			
-			com.google.cloud.apihub.v1.ExternalApi externalApipObj = ProtoJsonUtil.fromJson(externalApiStr, com.google.cloud.apihub.v1.ExternalApi.class);
-		    apiHubClient.createExternalApi(parent, externalApipObj, externalApiName);
+			//update targetUser with FQDN if exist
+			apiStr = FQDNHelper.updateFQDNJsonValue("$.targetUser.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
+		
+			//update team with FQDN if exist
+			apiStr = FQDNHelper.updateFQDNJsonValue("$.team.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
+			
+			//update businessUnit with FQDN if exist
+			apiStr = FQDNHelper.updateFQDNJsonValue("$.businessUnit.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
+			
+			//update maturityLevel with FQDN if exist
+			apiStr = FQDNHelper.updateFQDNJsonValue("$.maturityLevel.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
+			
+			//update apiStyle with FQDN if exist
+			apiStr = FQDNHelper.updateFQDNJsonValue("$.apiStyle.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
+			
+			//update selectedVersion with FQDN if exist
+			apiStr = FQDNHelper.updateFQDNJsonValue("$.selectedVersion", format("projects/%s/locations/%s", profile.getProjectId(), profile.getLocation()),apiStr);
+			
+			logger.debug("after modifying: "+ apiStr);
+			
+			com.google.cloud.apihub.v1.Api apiObj = ProtoJsonUtil.fromJson(apiStr, com.google.cloud.apihub.v1.Api.class);
+			apiHubClient.createApi(parent, apiObj, apiName);
 		    logger.info("Create success");
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -248,17 +268,17 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	}
 
 	/**
-	 * Delete External API
+	 * Delete Api
 	 * @param profile
-	 * @param externalApiName
+	 * @param apiName
 	 * @throws MojoExecutionException
 	 */
-	public void doDelete(BuildProfile profile, String externalApiName) throws MojoExecutionException {
+	public void doDelete(BuildProfile profile, String apiName) throws MojoExecutionException {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-			ExternalApiName name = ExternalApiName.of(profile.getProjectId(), profile.getLocation(), externalApiName);
-		    apiHubClient.deleteExternalApi(name);
+			ApiName name = ApiName.of(profile.getProjectId(), profile.getLocation(), apiName);
+			apiHubClient.deleteApi(name);
 		    logger.info("Delete success");
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -267,35 +287,59 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	}
 	
 	/**
-	 * Update External API
+	 * Update Api
 	 * @param profile
-	 * @param externalApiName
-	 * @param externalApiStr
+	 * @param apiName
+	 * @param apiStr
 	 * @throws MojoExecutionException
 	 */
-	public void doUpdate(BuildProfile profile, String externalApiName, String externalApiStr) throws MojoExecutionException {
+	public void doUpdate(BuildProfile profile, String apiName, String apiStr) throws MojoExecutionException {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
 			
-			//updating the name field in the attribute object to projects/{project}/locations/{location}/attributes/{attribute} format as its required by the updateAttribute method
-			externalApiStr = FQDNHelper.updateFQDNJsonValue("$.name", 
-															format("projects/%s/locations/%s/externalApis", profile.getProjectId(), profile.getLocation()), 
-															externalApiStr);
+			//updating the name field in the api object to projects/{project}/locations/{location}/apis/{api} format as its required by the updateApi method
+			apiStr = FQDNHelper.updateFQDNJsonValue("$.name", 
+											format("projects/%s/locations/%s/apis", profile.getProjectId(), profile.getLocation()), 
+											apiStr);
 			
 			//update attributes with FQDN if exist
-			externalApiStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", externalApiStr);
+			apiStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", apiStr);
+
+			//update targetUser with FQDN if exist
+			apiStr = FQDNHelper.updateFQDNJsonValue("$.targetUser.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
+		
+			//update team with FQDN if exist
+			apiStr = FQDNHelper.updateFQDNJsonValue("$.team.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
 			
+			//update businessUnit with FQDN if exist
+			apiStr = FQDNHelper.updateFQDNJsonValue("$.businessUnit.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
 			
-			com.google.cloud.apihub.v1.ExternalApi externalApiObj = ProtoJsonUtil.fromJson(externalApiStr, com.google.cloud.apihub.v1.ExternalApi.class);
+			//update maturityLevel with FQDN if exist
+			apiStr = FQDNHelper.updateFQDNJsonValue("$.maturityLevel.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
+			
+			//update apiStyle with FQDN if exist
+			apiStr = FQDNHelper.updateFQDNJsonValue("$.apiStyle.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
+			
+			//update selectedVersion with FQDN if exist
+			apiStr = FQDNHelper.updateFQDNJsonValue("$.selectedVersion", format("projects/%s/locations/%s", profile.getProjectId(), profile.getLocation()),apiStr);
+			
+			logger.debug("after modifying: "+ apiStr);
+			
+			com.google.cloud.apihub.v1.Api apiObj = ProtoJsonUtil.fromJson(apiStr, com.google.cloud.apihub.v1.Api.class);
 			List<String> fieldMaskValues = new ArrayList<>();
 			fieldMaskValues.add("display_name");
 			fieldMaskValues.add("description");
+			fieldMaskValues.add("owner");
 			fieldMaskValues.add("documentation");
-	        fieldMaskValues.add("endpoints");
-	        fieldMaskValues.add("paths");
+			fieldMaskValues.add("target_user");
+			fieldMaskValues.add("team");
+			fieldMaskValues.add("business_unit");
+			fieldMaskValues.add("maturity_level");
+			fieldMaskValues.add("api_style");
+			fieldMaskValues.add("attributes");
 			FieldMask updateMask = FieldMask.newBuilder().addAllPaths(fieldMaskValues).build();
-		    apiHubClient.updateExternalApi(externalApiObj, updateMask);
+			apiHubClient.updateApi(apiObj, updateMask);
 		    logger.info("Update success");
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -304,21 +348,21 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	}
 	
 	/**
-	 * Check if an external API exist
+	 * Check if an Api exist
 	 *  
 	 * @param profile
-	 * @param externalApiName
+	 * @param apiName
 	 * @return
 	 * @throws IOException
 	 */
-	public static boolean doesExternalApiExist(BuildProfile profile, String externalApiName)
+	public static boolean doesApiExist(BuildProfile profile, String apiName)
 	            throws IOException {
 		try {
-        	logger.info("Checking if External API - " +externalApiName + " exist");
+        	logger.info("Checking if Api - " +apiName + " exist");
         	ApiHubClient apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-        	ExternalApiName name = ExternalApiName.of(profile.getProjectId(), profile.getLocation(), externalApiName);
-        	com.google.cloud.apihub.v1.ExternalApi externalApiResponse = apiHubClient.getExternalApi(name);
-        	if(externalApiResponse == null) 
+        	ApiName name = ApiName.of(profile.getProjectId(), profile.getLocation(), apiName);
+        	com.google.cloud.apihub.v1.Api apiResponse = apiHubClient.getApi(name);
+        	if(apiResponse == null) 
             	return false;
         }
         catch (ApiException e) {
