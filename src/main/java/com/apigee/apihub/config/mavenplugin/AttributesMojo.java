@@ -31,13 +31,17 @@ import org.json.simple.parser.ParseException;
 import com.apigee.apihub.config.utils.ApiHubClientSingleton;
 import com.apigee.apihub.config.utils.BuildProfile;
 import com.apigee.apihub.config.utils.ConfigReader;
-import com.apigee.apihub.config.utils.FQDNHelper;
+import com.apigee.apihub.config.utils.PluginConstants;
+import com.apigee.apihub.config.utils.PluginUtils;
 import com.apigee.apihub.config.utils.ProtoJsonUtil;
 import com.google.api.client.util.Key;
+import com.google.api.client.util.Strings;
 import com.google.api.gax.rpc.ApiException;
 import com.google.api.gax.rpc.StatusCode.Code;
 import com.google.cloud.apihub.v1.ApiHubClient;
 import com.google.cloud.apihub.v1.AttributeName;
+import com.google.cloud.apihub.v1.ListAttributesRequest;
+import com.google.cloud.apihub.v1.ListAttributesResponse;
 import com.google.cloud.apihub.v1.LocationName;
 import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
@@ -56,7 +60,7 @@ public class AttributesMojo extends ApiHubAbstractMojo {
 	public static final String ____ATTENTION_MARKER____ = "************************************************************************";
 
 	enum OPTIONS {
-		none, create, update, delete, sync
+		none, create, update, delete, sync, export
 	}
 
 	OPTIONS buildOption = OPTIONS.none;
@@ -81,7 +85,9 @@ public class AttributesMojo extends ApiHubAbstractMojo {
 		Gson gson = new Gson();
 		try {
 			Attribute attribute = gson.fromJson(payload, Attribute.class);
-			return attribute.name;
+			String[] parts = attribute.name.split("/");
+			String attributeName = parts[parts.length - 1];
+			return attributeName;
 		} catch (JsonParseException e) {
 		  throw new MojoFailureException(e.getMessage());
 		}
@@ -125,6 +131,12 @@ public class AttributesMojo extends ApiHubAbstractMojo {
 			if (buildProfile.getConfigDir() == null) {
 				throw new MojoExecutionException("API Confile Dir is missing");
 			}
+			if (!buildOption.equals(OPTIONS.export) && buildProfile.getConfigDir() == null) {
+				throw new MojoExecutionException("API Confile Dir is missing");
+			}
+			if (buildOption.equals(OPTIONS.export) && buildProfile.getConfigExportDir() == null) {
+				throw new MojoExecutionException("Confile Export Dir is missing");
+			}
 			 
 
 		} catch (IllegalArgumentException e) {
@@ -146,9 +158,14 @@ public class AttributesMojo extends ApiHubAbstractMojo {
 
 		try {
 			init();
-			logger.info(format("Fetching attributes.json file from %s directory", buildProfile.getConfigDir()));
-			List<String> attributes = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/attributes.json");
-			processAttributes(attributes);
+			if(buildOption == OPTIONS.export) {
+				logger.info(format("Exporting attributes.json file to %s directory", buildProfile.getConfigExportDir()));
+				exportAttributes(buildProfile);
+			} else {
+				logger.info(format("Fetching attributes.json file from %s directory", buildProfile.getConfigDir()));
+				List<String> attributes = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/attributes.json");
+				processAttributes(attributes);
+			}
 
 		} catch (MojoFailureException e) {
 			throw e;
@@ -175,6 +192,7 @@ public class AttributesMojo extends ApiHubAbstractMojo {
 					return;
 			}
 			for (String attribute : attributes) {
+				attribute = PluginUtils.replacer(attribute, PluginConstants.PATTERN, format("projects/%s/locations/%s", buildProfile.getProjectId(), buildProfile.getLocation()));
 				String attributeName = getAttributeName(attribute);
 				if (attributeName == null) {
 	        		throw new IllegalArgumentException("Attribute does not have a name");
@@ -187,7 +205,7 @@ public class AttributesMojo extends ApiHubAbstractMojo {
 						case update:
 							logger.info(format("Attribute \"%s\" already exists. Updating.", attributeName));
 							//update
-							doUpdate(buildProfile, attributeName, attribute);
+							doUpdate(buildProfile, attribute);
 							break;
 						case delete:
 							logger.info(format("Attribute \"%s\" already exists. Deleting.", attributeName));
@@ -220,6 +238,44 @@ public class AttributesMojo extends ApiHubAbstractMojo {
 			}
 		}catch (Exception e) {
 			throw new RuntimeException(e.getMessage());
+		}
+	}
+	
+	/**
+	 * 
+	 * @param profile
+	 * @throws MojoExecutionException
+	 */
+	public void exportAttributes(BuildProfile profile) throws MojoExecutionException {
+		ApiHubClient apiHubClient = null;
+		List<String> attributesList = new ArrayList<String>();
+		try {
+			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
+			ListAttributesRequest request =
+					ListAttributesRequest.newBuilder()
+					.setParent(LocationName.of(profile.getProjectId(), profile.getLocation()).toString())
+					//.setFilter("display_name=\"API 1\"")
+					.setPageSize(PluginConstants.PAGE_SIZE).build();
+			while (true) {
+		     ListAttributesResponse response = apiHubClient.listAttributesCallable().call(request);
+		     for (com.google.cloud.apihub.v1.Attribute attribute : response.getAttributesList()) {
+		    	 String attrStr = ProtoJsonUtil.toJson(attribute);
+		    	 attrStr = PluginUtils.replacer(attrStr, PluginConstants.PATTERN1, format("projects/%s/locations/%s", PluginConstants.PROJECT_ID, PluginConstants.LOCATION));
+		    	 attributesList.add(attrStr);
+		     }
+		     PluginUtils.exportToFile(attributesList, profile.getConfigExportDir(), "attributes");
+		     String nextPageToken = response.getNextPageToken();
+		     if (!Strings.isNullOrEmpty(nextPageToken)) {
+		       request = request.toBuilder().setPageToken(nextPageToken).build();
+		     } else {
+		       break;
+		     }
+		   }
+		}catch (Exception e) {
+			throw new RuntimeException(e.getMessage());
+		}
+		finally {
+			apiHubClient.close();
 		}
 	}
 	
@@ -265,20 +321,13 @@ public class AttributesMojo extends ApiHubAbstractMojo {
 	/**
 	 * Update attribute
 	 * @param profile
-	 * @param attributeName
 	 * @param attributeStr
 	 * @throws MojoExecutionException
 	 */
-	public void doUpdate(BuildProfile profile, String attributeName, String attributeStr) throws MojoExecutionException {
+	public void doUpdate(BuildProfile profile, String attributeStr) throws MojoExecutionException {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-			
-			//updating the name field in the attribute object to projects/{project}/locations/{location}/attributes/{attribute} format as its required by the updateAttribute method
-			attributeStr = FQDNHelper.updateFQDNJsonValue("$.name", 
-															format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()), 
-															attributeStr);
-			
 			com.google.cloud.apihub.v1.Attribute attributeObj = ProtoJsonUtil.fromJson(attributeStr, com.google.cloud.apihub.v1.Attribute.class);
 			List<String> fieldMaskValues = new ArrayList<>();
 			fieldMaskValues.add("display_name");

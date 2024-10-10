@@ -1,6 +1,6 @@
 [
 	{
-	    "name": "sample-attribute1",
+	    "name": "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute1",
 	    "displayName": "sample-attribute1",
 	    "description": "Sample Attribute 1",
 	    "scope": "VERSION",
@@ -17,10 +17,10 @@
 	            "description": "https://google.com"
 	        }
 	    ],
-	    "cardinality": 1,
+	    "cardinality": 1
 	},
 	{
-	    "name": "sample-attribute2",
+	    "name": "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute2",
 	    "displayName": "sample-attribute2",
 	    "description": "Sample Attribute 2",
 	    "scope": "SPEC",
@@ -28,7 +28,7 @@
 	    "cardinality": 1
 	},
 	{
-	    "name": "sample-attribute3",
+	    "name": "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute3",
 	    "displayName": "sample-attribute3",
 	    "description": "Sample Attribute 3",
 	    "scope": "DEPLOYMENT",
@@ -36,7 +36,7 @@
 	    "cardinality": 1
 	},
 	{
-	    "name": "sample-attribute4",
+	    "name": "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute4",
 	    "displayName": "sample-attribute4",
 	    "description": "Sample Attribute 4",
 	    "scope": "DEPLOYMENT",
@@ -44,7 +44,7 @@
 	    "cardinality": 1
 	},
 	{
-	    "name": "sample-attribute5",
+	    "name": "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute5",
 	    "displayName": "sample-attribute5",
 	    "description": "Sample Attribute 5",
 	    "scope": "DEPENDENCY",
@@ -52,7 +52,7 @@
 	    "cardinality": 1
 	},
 	{
-	    "name": "sample-attribute6",
+	    "name": "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute6",
 	    "displayName": "sample-attribute6",
 	    "description": "Sample Attribute 6",
 	    "scope": "EXTERNAL_API",
@@ -60,7 +60,7 @@
 	    "cardinality": 1
 	},
 	{
-	    "name": "sample-attribute7",
+	    "name": "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute7",
 	    "displayName": "sample-attribute7",
 	    "description": "Sample Attribute 7",
 	    "scope": "EXTERNAL_API",
@@ -68,7 +68,7 @@
 	    "cardinality": 1
 	},
 	{
-	    "name": "sample-attribute8",
+	    "name": "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute8",
 	    "displayName": "sample-attribute8",
 	    "description": "Sample Attribute 8",
 	    "scope": "DEPENDENCY",
@@ -76,7 +76,7 @@
 	    "cardinality": 1
 	},
 	{
-	    "name": "sample-attribute9",
+	    "name": "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute9",
 	    "displayName": "sample-attribute9",
 	    "description": "Sample Attribute 9",
 	    "scope": "DEPENDENCY",
@@ -84,7 +84,7 @@
 	    "cardinality": 1
 	},
 	{
-	    "name": "sample-attribute10",
+	    "name": "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute10",
 	    "displayName": "sample-attribute10",
 	    "description": "Sample Attribute 10",
 	    "scope": "API",
@@ -92,7 +92,7 @@
 	    "cardinality": 1
 	},
 	{
-	    "name": "sample-attribute11",
+	    "name": "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute11",
 	    "displayName": "sample-attribute11",
 	    "description": "Sample Attribute 11",
 	    "scope": "EXTERNAL_API",

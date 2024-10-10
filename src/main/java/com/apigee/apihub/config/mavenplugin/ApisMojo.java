@@ -190,9 +190,7 @@ public class ApisMojo extends ApiHubAbstractMojo {
 					return;
 			}
 			for (String api : apis) {
-				//logger.debug("before modifying: "+ api);
 				api = PluginUtils.replacer(api, PluginConstants.PATTERN, format("projects/%s/locations/%s", buildProfile.getProjectId(), buildProfile.getLocation()));
-				//logger.debug("after modifying: "+ api);
 				String apiName = getApiName(api);
 				if (apiName == null) {
 	        		throw new IllegalArgumentException("Api does not have a name");
@@ -205,7 +203,7 @@ public class ApisMojo extends ApiHubAbstractMojo {
 						case update:
 							logger.info(format("Api \"%s\" already exists. Updating.", apiName));
 							//update
-							doUpdate(buildProfile, apiName, api);
+							doUpdate(buildProfile, api);
 							break;
 						case delete:
 							logger.info(format("Api \"%s\" already exists. Deleting.", apiName));
@@ -324,11 +322,10 @@ public class ApisMojo extends ApiHubAbstractMojo {
 	/**
 	 * Update Api
 	 * @param profile
-	 * @param apiName
 	 * @param apiStr
 	 * @throws MojoExecutionException
 	 */
-	public void doUpdate(BuildProfile profile, String apiName, String apiStr) throws MojoExecutionException {
+	public void doUpdate(BuildProfile profile, String apiStr) throws MojoExecutionException {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
