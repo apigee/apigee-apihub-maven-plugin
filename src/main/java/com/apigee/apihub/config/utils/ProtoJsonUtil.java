@@ -18,6 +18,10 @@ package com.apigee.apihub.config.utils;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParser;
 import com.google.protobuf.AbstractMessage.Builder;
 import com.google.protobuf.Message;
 import com.google.protobuf.MessageOrBuilder;
@@ -40,6 +44,18 @@ public final class ProtoJsonUtil {
    */
   public static String toJson(MessageOrBuilder messageOrBuilder) throws IOException {
     return JsonFormat.printer().print(messageOrBuilder);
+  }
+  
+  /**
+   * Makes a Json from a given message or builder
+   * 
+   * @param messageOrBuilder is the instance
+   * @return The string representation
+   * @throws IOException if any error occurs
+   */
+  public static String toPrettyPrintJson(MessageOrBuilder messageOrBuilder) throws IOException {
+	  Gson gson = new GsonBuilder().setPrettyPrinting().create();
+	  return gson.toJson(JsonParser.parseString(JsonFormat.printer().print(messageOrBuilder)));
   }
 
   /**

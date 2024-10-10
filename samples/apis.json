@@ -1,6 +1,6 @@
 [
    {
-      "name":"api1",
+      "name":"projects/PROJECT_ID/locations/someregion/apis/api1",
       "displayName":"API 1",
       "description":"API 1",
       "documentation":{
@@ -11,7 +11,7 @@
          "email":"api1-owner@example.com"
       },
       "targetUser":{
-         "attribute":"system-target-user",
+         "attribute":"projects/PROJECT_ID/locations/someregion/attributes/system-target-user",
          "enumValues":{
             "values":[
                {
@@ -21,7 +21,7 @@
          }
       },
       "team":{
-         "attribute":"system-team",
+         "attribute":"projects/PROJECT_ID/locations/someregion/attributes/system-team",
          "enumValues":{
             "values":[
                {
@@ -31,7 +31,7 @@
          }
       },
       "businessUnit":{
-         "attribute":"system-business-unit",
+         "attribute":"projects/PROJECT_ID/locations/someregion/attributes/system-business-unit",
          "enumValues":{
             "values":[
                {
@@ -41,7 +41,7 @@
          }
       },
       "maturityLevel":{
-         "attribute":"system-maturity-level",
+         "attribute":"projects/PROJECT_ID/locations/someregion/attributes/system-maturity-level",
          "enumValues":{
             "values":[
                {
@@ -51,7 +51,7 @@
          }
       },
       "apiStyle":{
-         "attribute":"system-api-style",
+         "attribute":"projects/PROJECT_ID/locations/someregion/attributes/system-api-style",
          "enumValues":{
             "values":[
                {
@@ -61,7 +61,8 @@
          }
       },
       "attributes":{
-         "sample-attribute10":{
+         "projects/PROJECT_ID/locations/someregion/attributes/sample-attribute10":{
+            "attribute":"projects/PROJECT_ID/locations/someregion/attributes/sample-attribute10",
             "stringValues":{
                "values":[
                   "Test"

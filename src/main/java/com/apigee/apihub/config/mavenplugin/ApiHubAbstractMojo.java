@@ -37,6 +37,13 @@ public abstract class ApiHubAbstractMojo extends AbstractMojo {
 	private String configDir;
 	
 	/**
+	 * Config Export Dir
+	 *
+	 * @parameter property="apigee.apihub.config.exportDir"
+	 */
+	private String configExportDir;
+	
+	/**
 	 * Config File
 	 *
 	 * @parameter property="apigee.apihub.config.file"
@@ -75,6 +82,13 @@ public abstract class ApiHubAbstractMojo extends AbstractMojo {
 	 * @parameter property="apigee.apihub.bearer"
 	 */
 	private String bearer;
+	
+	/**
+	 * Gateway bearer token
+	 *
+	 * @parameter property="apigee.apihub.force.delete"
+	 */
+	private boolean forceDelete;
 
 	/**
 	 * Skip running this plugin. Default is false.
@@ -96,9 +110,11 @@ public abstract class ApiHubAbstractMojo extends AbstractMojo {
 		this.buildProfile.setOptions(this.options);
 		this.buildProfile.setConfigFile(this.configFile);
 		this.buildProfile.setConfigDir(this.configDir);
+		this.buildProfile.setConfigExportDir(this.configExportDir);
 		this.buildProfile.setSpecDirectory(this.specDirectory);
 		this.buildProfile.setServiceAccountFilePath(this.serviceAccountFilePath);
 		this.buildProfile.setBearer(this.bearer);
+		this.buildProfile.setForceDelete(this.forceDelete);
 		return buildProfile;
 	}
 	

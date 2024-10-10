@@ -31,13 +31,18 @@ import org.json.simple.parser.ParseException;
 import com.apigee.apihub.config.utils.ApiHubClientSingleton;
 import com.apigee.apihub.config.utils.BuildProfile;
 import com.apigee.apihub.config.utils.ConfigReader;
-import com.apigee.apihub.config.utils.FQDNHelper;
+import com.apigee.apihub.config.utils.PluginConstants;
+import com.apigee.apihub.config.utils.PluginUtils;
 import com.apigee.apihub.config.utils.ProtoJsonUtil;
 import com.google.api.client.util.Key;
+import com.google.api.client.util.Strings;
 import com.google.api.gax.rpc.ApiException;
 import com.google.api.gax.rpc.StatusCode.Code;
 import com.google.cloud.apihub.v1.ApiHubClient;
 import com.google.cloud.apihub.v1.ApiName;
+import com.google.cloud.apihub.v1.DeleteApiRequest;
+import com.google.cloud.apihub.v1.ListApisRequest;
+import com.google.cloud.apihub.v1.ListApisResponse;
 import com.google.cloud.apihub.v1.LocationName;
 import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
@@ -54,9 +59,9 @@ public class ApisMojo extends ApiHubAbstractMojo {
 	static Logger logger = LogManager.getLogger(ApisMojo.class);
 
 	public static final String ____ATTENTION_MARKER____ = "************************************************************************";
-
+			
 	enum OPTIONS {
-		none, create, update, delete, sync
+		none, create, update, delete, sync, export
 	}
 
 	OPTIONS buildOption = OPTIONS.none;
@@ -81,7 +86,9 @@ public class ApisMojo extends ApiHubAbstractMojo {
 		Gson gson = new Gson();
 		try {
 			Api api = gson.fromJson(payload, Api.class);
-			return api.name;
+			String[] parts = api.name.split("/");
+			String apiName = parts[parts.length - 1];
+			return apiName;
 		} catch (JsonParseException e) {
 		  throw new MojoFailureException(e.getMessage());
 		}
@@ -122,8 +129,11 @@ public class ApisMojo extends ApiHubAbstractMojo {
 			if (buildProfile.getServiceAccountFilePath() == null && buildProfile.getBearer() == null) {
 				throw new MojoExecutionException("Service Account file path or Bearer token is missing");
 			}
-			if (buildProfile.getConfigDir() == null) {
+			if (!buildOption.equals(OPTIONS.export) && buildProfile.getConfigDir() == null) {
 				throw new MojoExecutionException("API Confile Dir is missing");
+			}
+			if (buildOption.equals(OPTIONS.export) && buildProfile.getConfigExportDir() == null) {
+				throw new MojoExecutionException("Confile Export Dir is missing");
 			}
 			 
 
@@ -146,9 +156,14 @@ public class ApisMojo extends ApiHubAbstractMojo {
 
 		try {
 			init();
-			logger.info(format("Fetching apis.json file from %s directory", buildProfile.getConfigDir()));
-			List<String> apis = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/apis.json");
-			processApis(apis);
+			if(buildOption == OPTIONS.export) {
+				logger.info(format("Exporting apis.json file to %s directory", buildProfile.getConfigExportDir()));
+				exportApis(buildProfile);
+			} else {
+				logger.info(format("Fetching apis.json file from %s directory", buildProfile.getConfigDir()));
+				List<String> apis = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/apis.json");
+				processApis(apis);
+			}
 
 		} catch (MojoFailureException e) {
 			throw e;
@@ -175,6 +190,9 @@ public class ApisMojo extends ApiHubAbstractMojo {
 					return;
 			}
 			for (String api : apis) {
+				//logger.debug("before modifying: "+ api);
+				api = PluginUtils.replacer(api, PluginConstants.PATTERN, format("projects/%s/locations/%s", buildProfile.getProjectId(), buildProfile.getLocation()));
+				//logger.debug("after modifying: "+ api);
 				String apiName = getApiName(api);
 				if (apiName == null) {
 	        		throw new IllegalArgumentException("Api does not have a name");
@@ -224,7 +242,46 @@ public class ApisMojo extends ApiHubAbstractMojo {
 	}
 	
 	/**
+	 * 
+	 * @param profile
+	 * @throws MojoExecutionException
+	 */
+	public void exportApis(BuildProfile profile) throws MojoExecutionException {
+		ApiHubClient apiHubClient = null;
+		List<String> apiList = new ArrayList<String>();
+		try {
+			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
+			ListApisRequest request =
+				ListApisRequest.newBuilder()
+					.setParent(LocationName.of(profile.getProjectId(), profile.getLocation()).toString())
+					//.setFilter("display_name=\"API 1\"")
+					.setPageSize(PluginConstants.PAGE_SIZE).build();
+			while (true) {
+		     ListApisResponse response = apiHubClient.listApisCallable().call(request);
+		     for (com.google.cloud.apihub.v1.Api api : response.getApisList()) {
+		    	 String apiStr = ProtoJsonUtil.toJson(api);
+		    	 apiStr = PluginUtils.replacer(apiStr, PluginConstants.PATTERN1, format("projects/%s/locations/%s", PluginConstants.PROJECT_ID, PluginConstants.LOCATION));
+		    	 apiList.add(apiStr);
+		     }
+		     PluginUtils.exportToFile(apiList, profile.getConfigExportDir(), "apis");
+		     String nextPageToken = response.getNextPageToken();
+		     if (!Strings.isNullOrEmpty(nextPageToken)) {
+		       request = request.toBuilder().setPageToken(nextPageToken).build();
+		     } else {
+		       break;
+		     }
+		   }
+		}catch (Exception e) {
+			throw new RuntimeException(e.getMessage());
+		}
+		finally {
+			apiHubClient.close();
+		}
+	}
+	
+	/**
 	 * Create Api
+	 * @param profile
 	 * @param apiName
 	 * @param apiStr
 	 * @throws MojoExecutionException
@@ -234,30 +291,6 @@ public class ApisMojo extends ApiHubAbstractMojo {
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
 			LocationName parent = LocationName.of(profile.getProjectId(), profile.getLocation());
-			
-			//update attributes with FQDN if exist
-			apiStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", apiStr);
-			
-			//update targetUser with FQDN if exist
-			apiStr = FQDNHelper.updateFQDNJsonValue("$.targetUser.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
-		
-			//update team with FQDN if exist
-			apiStr = FQDNHelper.updateFQDNJsonValue("$.team.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
-			
-			//update businessUnit with FQDN if exist
-			apiStr = FQDNHelper.updateFQDNJsonValue("$.businessUnit.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
-			
-			//update maturityLevel with FQDN if exist
-			apiStr = FQDNHelper.updateFQDNJsonValue("$.maturityLevel.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
-			
-			//update apiStyle with FQDN if exist
-			apiStr = FQDNHelper.updateFQDNJsonValue("$.apiStyle.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
-			
-			//update selectedVersion with FQDN if exist
-			apiStr = FQDNHelper.updateFQDNJsonValue("$.selectedVersion", format("projects/%s/locations/%s", profile.getProjectId(), profile.getLocation()),apiStr);
-			
-			logger.debug("after modifying: "+ apiStr);
-			
 			com.google.cloud.apihub.v1.Api apiObj = ProtoJsonUtil.fromJson(apiStr, com.google.cloud.apihub.v1.Api.class);
 			apiHubClient.createApi(parent, apiObj, apiName);
 		    logger.info("Create success");
@@ -266,6 +299,7 @@ public class ApisMojo extends ApiHubAbstractMojo {
 			throw new RuntimeException("Create failure: " + e.getMessage());
 		}
 	}
+
 
 	/**
 	 * Delete Api
@@ -278,7 +312,8 @@ public class ApisMojo extends ApiHubAbstractMojo {
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
 			ApiName name = ApiName.of(profile.getProjectId(), profile.getLocation(), apiName);
-			apiHubClient.deleteApi(name);
+			DeleteApiRequest request = DeleteApiRequest.newBuilder().setName(name.toString()).setForce(profile.getForceDelete()).build();
+			apiHubClient.deleteApi(request);
 		    logger.info("Delete success");
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -297,35 +332,6 @@ public class ApisMojo extends ApiHubAbstractMojo {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-			
-			//updating the name field in the api object to projects/{project}/locations/{location}/apis/{api} format as its required by the updateApi method
-			apiStr = FQDNHelper.updateFQDNJsonValue("$.name", 
-											format("projects/%s/locations/%s/apis", profile.getProjectId(), profile.getLocation()), 
-											apiStr);
-			
-			//update attributes with FQDN if exist
-			apiStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", apiStr);
-
-			//update targetUser with FQDN if exist
-			apiStr = FQDNHelper.updateFQDNJsonValue("$.targetUser.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
-		
-			//update team with FQDN if exist
-			apiStr = FQDNHelper.updateFQDNJsonValue("$.team.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
-			
-			//update businessUnit with FQDN if exist
-			apiStr = FQDNHelper.updateFQDNJsonValue("$.businessUnit.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
-			
-			//update maturityLevel with FQDN if exist
-			apiStr = FQDNHelper.updateFQDNJsonValue("$.maturityLevel.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
-			
-			//update apiStyle with FQDN if exist
-			apiStr = FQDNHelper.updateFQDNJsonValue("$.apiStyle.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiStr);
-			
-			//update selectedVersion with FQDN if exist
-			apiStr = FQDNHelper.updateFQDNJsonValue("$.selectedVersion", format("projects/%s/locations/%s", profile.getProjectId(), profile.getLocation()),apiStr);
-			
-			logger.debug("after modifying: "+ apiStr);
-			
 			com.google.cloud.apihub.v1.Api apiObj = ProtoJsonUtil.fromJson(apiStr, com.google.cloud.apihub.v1.Api.class);
 			List<String> fieldMaskValues = new ArrayList<>();
 			fieldMaskValues.add("display_name");
