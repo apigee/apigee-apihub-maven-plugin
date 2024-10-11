@@ -321,7 +321,6 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	/**
 	 * Update External API
 	 * @param profile
-	 * @param externalApiName
 	 * @param externalApiStr
 	 * @throws MojoExecutionException
 	 */

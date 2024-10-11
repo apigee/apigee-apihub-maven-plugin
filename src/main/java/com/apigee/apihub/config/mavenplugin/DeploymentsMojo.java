@@ -31,13 +31,17 @@ import org.json.simple.parser.ParseException;
 import com.apigee.apihub.config.utils.ApiHubClientSingleton;
 import com.apigee.apihub.config.utils.BuildProfile;
 import com.apigee.apihub.config.utils.ConfigReader;
-import com.apigee.apihub.config.utils.FQDNHelper;
+import com.apigee.apihub.config.utils.PluginConstants;
+import com.apigee.apihub.config.utils.PluginUtils;
 import com.apigee.apihub.config.utils.ProtoJsonUtil;
 import com.google.api.client.util.Key;
+import com.google.api.client.util.Strings;
 import com.google.api.gax.rpc.ApiException;
 import com.google.api.gax.rpc.StatusCode.Code;
 import com.google.cloud.apihub.v1.ApiHubClient;
 import com.google.cloud.apihub.v1.DeploymentName;
+import com.google.cloud.apihub.v1.ListDeploymentsRequest;
+import com.google.cloud.apihub.v1.ListDeploymentsResponse;
 import com.google.cloud.apihub.v1.LocationName;
 import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
@@ -56,7 +60,7 @@ public class DeploymentsMojo extends ApiHubAbstractMojo {
 	public static final String ____ATTENTION_MARKER____ = "************************************************************************";
 
 	enum OPTIONS {
-		none, create, update, delete, sync
+		none, create, update, delete, sync, export
 	}
 
 	OPTIONS buildOption = OPTIONS.none;
@@ -81,7 +85,9 @@ public class DeploymentsMojo extends ApiHubAbstractMojo {
 		Gson gson = new Gson();
 		try {
 			Deployment deployment = gson.fromJson(payload, Deployment.class);
-			return deployment.name;
+			String[] parts = deployment.name.split("/");
+			String deploymentName = parts[parts.length - 1];
+			return deploymentName;
 		} catch (JsonParseException e) {
 		  throw new MojoFailureException(e.getMessage());
 		}
@@ -125,6 +131,12 @@ public class DeploymentsMojo extends ApiHubAbstractMojo {
 			if (buildProfile.getConfigDir() == null) {
 				throw new MojoExecutionException("API Confile Dir is missing");
 			}
+			if (!buildOption.equals(OPTIONS.export) && buildProfile.getConfigDir() == null) {
+				throw new MojoExecutionException("API Confile Dir is missing");
+			}
+			if (buildOption.equals(OPTIONS.export) && buildProfile.getConfigExportDir() == null) {
+				throw new MojoExecutionException("Confile Export Dir is missing");
+			}
 			 
 
 		} catch (IllegalArgumentException e) {
@@ -146,9 +158,14 @@ public class DeploymentsMojo extends ApiHubAbstractMojo {
 
 		try {
 			init();
-			logger.info(format("Fetching deployments.json file from %s directory", buildProfile.getConfigDir()));
-			List<String> deployments = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/deployments.json");
-			processDeployments(deployments);
+			if(buildOption == OPTIONS.export) {
+				logger.info(format("Exporting deployments.json file to %s directory", buildProfile.getConfigExportDir()));
+				exportDeployments(buildProfile);
+			} else {
+				logger.info(format("Fetching deployments.json file from %s directory", buildProfile.getConfigDir()));
+				List<String> deployments = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/deployments.json");
+				processDeployments(deployments);
+			}
 
 		} catch (MojoFailureException e) {
 			throw e;
@@ -187,7 +204,7 @@ public class DeploymentsMojo extends ApiHubAbstractMojo {
 						case update:
 							logger.info(format("Deployment \"%s\" already exists. Updating.", deploymentName));
 							//update
-							doUpdate(buildProfile, deploymentName, deployment);
+							doUpdate(buildProfile, deployment);
 							break;
 						case delete:
 							logger.info(format("Deployment \"%s\" already exists. Deleting.", deploymentName));
@@ -224,6 +241,44 @@ public class DeploymentsMojo extends ApiHubAbstractMojo {
 	}
 	
 	/**
+	 * 
+	 * @param profile
+	 * @throws MojoExecutionException
+	 */
+	public void exportDeployments(BuildProfile profile) throws MojoExecutionException {
+		ApiHubClient apiHubClient = null;
+		List<String> deploymentList = new ArrayList<String>();
+		try {
+			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
+			ListDeploymentsRequest request =
+					ListDeploymentsRequest.newBuilder()
+					.setParent(LocationName.of(profile.getProjectId(), profile.getLocation()).toString())
+					//.setFilter("display_name=\"API 1\"")
+					.setPageSize(PluginConstants.PAGE_SIZE).build();
+			while (true) {
+		     ListDeploymentsResponse response = apiHubClient.listDeploymentsCallable().call(request);
+		     for (com.google.cloud.apihub.v1.Deployment deployment : response.getDeploymentsList()) {
+		    	 String deploymentStr = ProtoJsonUtil.toJson(deployment);
+		    	 deploymentStr = PluginUtils.replacer(deploymentStr, PluginConstants.PATTERN1, format("projects/%s/locations/%s", PluginConstants.PROJECT_ID, PluginConstants.LOCATION));
+		    	 deploymentList.add(deploymentStr);
+		     }
+		     PluginUtils.exportToFile(deploymentList, profile.getConfigExportDir(), "deployments");
+		     String nextPageToken = response.getNextPageToken();
+		     if (!Strings.isNullOrEmpty(nextPageToken)) {
+		       request = request.toBuilder().setPageToken(nextPageToken).build();
+		     } else {
+		       break;
+		     }
+		   }
+		}catch (Exception e) {
+			throw new RuntimeException(e.getMessage());
+		}
+		finally {
+			apiHubClient.close();
+		}
+	}
+	
+	/**
 	 * Create Deployment
 	 * @param deploymentName
 	 * @param deploymentStr
@@ -234,20 +289,6 @@ public class DeploymentsMojo extends ApiHubAbstractMojo {
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
 			LocationName parent = LocationName.of(profile.getProjectId(), profile.getLocation());
-			
-			//update attributes with FQDN if exist
-			deploymentStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", deploymentStr);
-			
-			//update slo with FQDN if exist
-			deploymentStr = FQDNHelper.updateFQDNJsonValue("$.slo.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),deploymentStr);
-		
-			//update environment with FQDN if exist
-			deploymentStr = FQDNHelper.updateFQDNJsonValue("$.environment.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),deploymentStr);
-			
-			//update deploymentType with FQDN if exist
-			deploymentStr = FQDNHelper.updateFQDNJsonValue("$.deploymentType.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),deploymentStr);
-			logger.debug("after modifying: "+ deploymentStr);
-			
 			com.google.cloud.apihub.v1.Deployment deploymentObj = ProtoJsonUtil.fromJson(deploymentStr, com.google.cloud.apihub.v1.Deployment.class);
 			apiHubClient.createDeployment(parent, deploymentObj, deploymentName);
 		    logger.info("Create success");
@@ -279,33 +320,13 @@ public class DeploymentsMojo extends ApiHubAbstractMojo {
 	/**
 	 * Update Deployment
 	 * @param profile
-	 * @param deploymentName
 	 * @param deploymentStr
 	 * @throws MojoExecutionException
 	 */
-	public void doUpdate(BuildProfile profile, String deploymentName, String deploymentStr) throws MojoExecutionException {
+	public void doUpdate(BuildProfile profile, String deploymentStr) throws MojoExecutionException {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-			
-			//updating the name field in the deployment object to projects/{project}/locations/{location}/deployments/{deployment} format as its required by the updateDeployment method
-			deploymentStr = FQDNHelper.updateFQDNJsonValue("$.name", 
-											format("projects/%s/locations/%s/deployments", profile.getProjectId(), profile.getLocation()), 
-											deploymentStr);
-			
-			//update attributes with FQDN if exist
-			deploymentStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", deploymentStr);
-
-			//update slo with FQDN if exist
-			deploymentStr = FQDNHelper.updateFQDNJsonValue("$.slo.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),deploymentStr);
-			
-			//update environment with FQDN if exist
-			deploymentStr = FQDNHelper.updateFQDNJsonValue("$.environment.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),deploymentStr);
-			
-			//update deploymentType with FQDN if exist
-			deploymentStr = FQDNHelper.updateFQDNJsonValue("$.deploymentType.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),deploymentStr);
-			logger.debug("after modifying: "+ deploymentStr);
-			
 			com.google.cloud.apihub.v1.Deployment deploymentObj = ProtoJsonUtil.fromJson(deploymentStr, com.google.cloud.apihub.v1.Deployment.class);
 			List<String> fieldMaskValues = new ArrayList<>();
 			fieldMaskValues.add("display_name");
