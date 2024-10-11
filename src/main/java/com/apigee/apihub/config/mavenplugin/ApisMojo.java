@@ -261,14 +261,15 @@ public class ApisMojo extends ApiHubAbstractMojo {
 		    	 apiStr = PluginUtils.replacer(apiStr, PluginConstants.PATTERN1, format("projects/%s/locations/%s", PluginConstants.PROJECT_ID, PluginConstants.LOCATION));
 		    	 apiList.add(apiStr);
 		     }
-		     PluginUtils.exportToFile(apiList, profile.getConfigExportDir(), "apis");
 		     String nextPageToken = response.getNextPageToken();
+		     logger.debug("nextPageToken: "+nextPageToken);
 		     if (!Strings.isNullOrEmpty(nextPageToken)) {
 		       request = request.toBuilder().setPageToken(nextPageToken).build();
 		     } else {
 		       break;
 		     }
 		   }
+			PluginUtils.exportToFile(apiList, profile.getConfigExportDir(), "apis");
 		}catch (Exception e) {
 			throw new RuntimeException(e.getMessage());
 		}
