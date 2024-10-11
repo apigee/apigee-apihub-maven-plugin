@@ -259,7 +259,7 @@ public class ApisMojo extends ApiHubAbstractMojo {
 		     for (com.google.cloud.apihub.v1.Api api : response.getApisList()) {
 		    	 String apiStr = ProtoJsonUtil.toJson(api);
 		    	 apiStr = PluginUtils.replacer(apiStr, PluginConstants.PATTERN1, format("projects/%s/locations/%s", PluginConstants.PROJECT_ID, PluginConstants.LOCATION));
-		    	 apiList.add(apiStr);
+		    	 apiList.add(PluginUtils.cleanseResponse(apiStr));
 		     }
 		     String nextPageToken = response.getNextPageToken();
 		     logger.debug("nextPageToken: "+nextPageToken);

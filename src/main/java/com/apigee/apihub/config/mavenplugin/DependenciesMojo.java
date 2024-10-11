@@ -261,7 +261,7 @@ public class DependenciesMojo extends ApiHubAbstractMojo {
 		     for (com.google.cloud.apihub.v1.Dependency dependency : response.getDependenciesList()) {
 		    	 String dependencyStr = ProtoJsonUtil.toJson(dependency);
 		    	 dependencyStr = PluginUtils.replacer(dependencyStr, PluginConstants.PATTERN1, format("projects/%s/locations/%s", PluginConstants.PROJECT_ID, PluginConstants.LOCATION));
-		    	 dependenciesList.add(dependencyStr);
+		    	 dependenciesList.add(PluginUtils.cleanseResponse(dependencyStr));
 		     }
 		     String nextPageToken = response.getNextPageToken();
 		     logger.debug("nextPageToken: "+ nextPageToken);

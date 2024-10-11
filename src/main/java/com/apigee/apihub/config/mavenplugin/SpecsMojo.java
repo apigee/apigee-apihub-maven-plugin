@@ -305,14 +305,10 @@ public class SpecsMojo extends ApiHubAbstractMojo {
 									JsonObject jsonObject1 = gson.fromJson(specContentStr, JsonObject.class);
 							    	String specStr = ProtoJsonUtil.toJson(spec);
 							    	JsonObject jsonObject2 = gson.fromJson(specStr, JsonObject.class);
-							    	jsonObject2.remove("createTime");
-							    	jsonObject2.remove("updateTime");
-							    	jsonObject2.remove("details");
-							    	jsonObject2.remove("lintResponse");
 							    	jsonObject2.add("contents", jsonObject1);
 							    	String newStr = gson.toJson(jsonObject2);
 							    	newStr = PluginUtils.replacer(newStr, PluginConstants.PATTERN1, format("projects/%s/locations/%s", PluginConstants.PROJECT_ID, PluginConstants.LOCATION));
-							    	specsList.add(newStr);
+							    	specsList.add(PluginUtils.cleanseResponse(newStr));
 							    }
 								String specNextPageToken = specResponse.getNextPageToken();
 							     if (!Strings.isNullOrEmpty(specNextPageToken)) {

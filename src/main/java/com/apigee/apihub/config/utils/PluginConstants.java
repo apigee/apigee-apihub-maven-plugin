@@ -23,4 +23,9 @@ public final class PluginConstants {
 	public static final String LOCATION = "LOCATION";
 	public static final String PATTERN = "projects\\\\/[^\\\\/]+\\\\/locations\\\\/[^\\\\/]+";
 	public static final String PATTERN1 = "projects\\/[^\\/]+\\/locations\\/[^\\/]+";
+	public static final String[] REMOVE_FIELDS = {"createTime", "updateTime", "details", 
+													"lintResponse", "versions", "apiVersions", 
+													"state", "discoveryMode", "errorDetail",
+													"definitionType", "mandatory"
+												};
 }

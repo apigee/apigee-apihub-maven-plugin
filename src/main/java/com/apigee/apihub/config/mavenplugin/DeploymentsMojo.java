@@ -260,7 +260,7 @@ public class DeploymentsMojo extends ApiHubAbstractMojo {
 		     for (com.google.cloud.apihub.v1.Deployment deployment : response.getDeploymentsList()) {
 		    	 String deploymentStr = ProtoJsonUtil.toJson(deployment);
 		    	 deploymentStr = PluginUtils.replacer(deploymentStr, PluginConstants.PATTERN1, format("projects/%s/locations/%s", PluginConstants.PROJECT_ID, PluginConstants.LOCATION));
-		    	 deploymentList.add(deploymentStr);
+		    	 deploymentList.add(PluginUtils.cleanseResponse(deploymentStr));
 		     }
 		     String nextPageToken = response.getNextPageToken();
 		     logger.debug("nextPageToken: "+ nextPageToken);

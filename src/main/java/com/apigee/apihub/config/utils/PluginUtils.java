@@ -32,6 +32,7 @@ import com.apigee.apihub.config.mavenplugin.ApisMojo;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 public class PluginUtils {
@@ -85,6 +86,29 @@ public class PluginUtils {
 				ex.printStackTrace();
 			}
 		}
+	}
+	
+	/**
+	 * 
+	 * @param obj
+	 * @return
+	 * @throws IOException
+	 * @throws MojoFailureException
+	 */
+	public static String cleanseResponse(String obj)
+            throws IOException, MojoFailureException {
+		Gson gson = new Gson();
+		String cleansedStr = null;
+		try {
+			JsonObject jsonObject = gson.fromJson(obj, JsonObject.class);
+			for (String field : PluginConstants.REMOVE_FIELDS) {
+				jsonObject.remove(field);
+			}
+			cleansedStr = gson.toJson(jsonObject);
+		}catch (Exception e) {
+			throw new RuntimeException(e.getMessage());
+		}
+		return cleansedStr;
 	}
 	
 	public static void main (String args[]) throws Exception {

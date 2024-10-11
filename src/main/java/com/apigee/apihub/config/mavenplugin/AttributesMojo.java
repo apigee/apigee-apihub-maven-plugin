@@ -261,7 +261,7 @@ public class AttributesMojo extends ApiHubAbstractMojo {
 		     for (com.google.cloud.apihub.v1.Attribute attribute : response.getAttributesList()) {
 		    	 String attrStr = ProtoJsonUtil.toJson(attribute);
 		    	 attrStr = PluginUtils.replacer(attrStr, PluginConstants.PATTERN1, format("projects/%s/locations/%s", PluginConstants.PROJECT_ID, PluginConstants.LOCATION));
-		    	 attributesList.add(attrStr);
+		    	 attributesList.add(PluginUtils.cleanseResponse(attrStr));
 		     }
 		     String nextPageToken = response.getNextPageToken();
 		     logger.debug("nextPageToken: "+ nextPageToken);

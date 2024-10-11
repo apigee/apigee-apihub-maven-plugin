@@ -261,7 +261,7 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 		     for (com.google.cloud.apihub.v1.ExternalApi api : response.getExternalApisList()) {
 		    	 String apiStr = ProtoJsonUtil.toJson(api);
 		    	 apiStr = PluginUtils.replacer(apiStr, PluginConstants.PATTERN1, format("projects/%s/locations/%s", PluginConstants.PROJECT_ID, PluginConstants.LOCATION));
-		    	 externalApiList.add(apiStr);
+		    	 externalApiList.add(PluginUtils.cleanseResponse(apiStr));
 		     }
 		     String nextPageToken = response.getNextPageToken();
 		     logger.debug("nextPageToken: "+ nextPageToken);
