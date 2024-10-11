@@ -21,6 +21,8 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -82,6 +84,19 @@ public class PluginUtils {
 			} catch (IOException ex) {
 				ex.printStackTrace();
 			}
+		}
+	}
+	
+	public static void main (String args[]) throws Exception {
+		String specName = "projects/PROJECT_ID/locations/LOCATION/apis/api1/versions/version-1/specs/spec1";
+		String pattern = ".*\\/apis\\/([a-zA-Z0-9-_]+)\\/versions\\/([a-zA-Z0-9-_]+).*";
+		Pattern p = Pattern.compile(pattern);
+		Matcher m = p.matcher(specName);
+		if(m.matches()) {
+			String apiName = m.group(1);
+			String version = m.group(2);
+			System.out.println("apiName: "+ apiName);
+			System.out.println("version: "+ version);
 		}
 	}
 

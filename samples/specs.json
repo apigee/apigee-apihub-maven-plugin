@@ -1,9 +1,9 @@
 [
    {
-      "name":"api1/versions/version-1/specs/spec1",
+      "name":"projects/PROJECT_ID/locations/LOCATION/apis/api1/versions/version-1/specs/spec1",
       "displayName":"API Spec 1",
       "specType":{
-         "attribute":"system-spec-type",
+         "attribute":"projects/PROJECT_ID/locations/LOCATION/attributes/system-spec-type",
          "enumValues":{
             "values":[
                {
@@ -17,7 +17,7 @@
          "mimeType": "application/yaml"
       },
       "attributes":{
-         "sample-attribute2":{
+         "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute2":{
             "jsonValues":{
                "values":[
                   "{\"foo\":\"bar\"}"

@@ -34,13 +34,25 @@ import com.apigee.apihub.config.utils.ApiHubClientSingleton;
 import com.apigee.apihub.config.utils.BuildProfile;
 import com.apigee.apihub.config.utils.ConfigReader;
 import com.apigee.apihub.config.utils.FQDNHelper;
+import com.apigee.apihub.config.utils.PluginConstants;
+import com.apigee.apihub.config.utils.PluginUtils;
 import com.apigee.apihub.config.utils.ProtoJsonUtil;
 import com.google.api.client.util.Key;
+import com.google.api.client.util.Strings;
 import com.google.api.gax.rpc.ApiException;
 import com.google.api.gax.rpc.StatusCode.Code;
 import com.google.cloud.apihub.v1.ApiHubClient;
+import com.google.cloud.apihub.v1.ListApisRequest;
+import com.google.cloud.apihub.v1.ListApisResponse;
+import com.google.cloud.apihub.v1.ListSpecsRequest;
+import com.google.cloud.apihub.v1.ListSpecsResponse;
+import com.google.cloud.apihub.v1.ListVersionsRequest;
+import com.google.cloud.apihub.v1.ListVersionsResponse;
+import com.google.cloud.apihub.v1.LocationName;
+import com.google.cloud.apihub.v1.SpecContents;
 import com.google.cloud.apihub.v1.VersionName;
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.protobuf.FieldMask;
 
@@ -57,7 +69,7 @@ public class SpecsMojo extends ApiHubAbstractMojo {
 	public static final String ____ATTENTION_MARKER____ = "************************************************************************";
 
 	enum OPTIONS {
-		none, create, update, delete, sync
+		none, create, update, delete, sync, export
 	}
 
 	OPTIONS buildOption = OPTIONS.none;
@@ -76,6 +88,19 @@ public class SpecsMojo extends ApiHubAbstractMojo {
         @Key
         public String name;
     }
+	
+	protected String getSpecId(String payload) 
+            throws MojoFailureException {
+		Gson gson = new Gson();
+		try {
+			Spec spec = gson.fromJson(payload, Spec.class);
+			String[] parts = spec.name.split("/");
+			String specName = parts[parts.length - 1];
+			return specName;
+		} catch (JsonParseException e) {
+		  throw new MojoFailureException(e.getMessage());
+		}
+	}
 	
 	protected String getSpecName(String payload) 
             throws MojoFailureException {
@@ -126,6 +151,12 @@ public class SpecsMojo extends ApiHubAbstractMojo {
 			if (buildProfile.getConfigDir() == null) {
 				throw new MojoExecutionException("API Confile Dir is missing");
 			}
+			if (!buildOption.equals(OPTIONS.export) && buildProfile.getConfigDir() == null) {
+				throw new MojoExecutionException("API Confile Dir is missing");
+			}
+			if (buildOption.equals(OPTIONS.export) && buildProfile.getConfigExportDir() == null) {
+				throw new MojoExecutionException("Confile Export Dir is missing");
+			}
 			 
 
 		} catch (IllegalArgumentException e) {
@@ -147,9 +178,14 @@ public class SpecsMojo extends ApiHubAbstractMojo {
 
 		try {
 			init();
-			logger.info(format("Fetching specs.json file from %s directory", buildProfile.getConfigDir()));
-			List<String> specs = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/specs.json");
-			processSpecs(specs);
+			if(buildOption == OPTIONS.export) {
+				logger.info(format("Exporting specs.json file to %s directory", buildProfile.getConfigExportDir()));
+				exportSpecs(buildProfile);
+			} else {
+				logger.info(format("Fetching specs.json file from %s directory", buildProfile.getConfigDir()));
+				List<String> specs = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/specs.json");
+				processSpecs(specs);
+			}
 
 		} catch (MojoFailureException e) {
 			throw e;
@@ -176,16 +212,12 @@ public class SpecsMojo extends ApiHubAbstractMojo {
 					return;
 			}
 			for (String spec : specs) {
-				String specName = getSpecName(spec);
-				String pattern = "^([a-zA-Z0-9-_]+)\\/versions\\/([a-zA-Z0-9-_]+)\\/specs\\/([a-zA-Z0-9-_]+)$"; //{api}/versions/{version}/specs/{spec}
-				Pattern p = Pattern.compile(pattern);
-				Matcher m = p.matcher(specName);
+				spec = PluginUtils.replacer(spec, PluginConstants.PATTERN, format("projects/%s/locations/%s", buildProfile.getProjectId(), buildProfile.getLocation()));
+				String specId = getSpecId(spec);
+				String specName = getSpecName(spec); //FQDN
 				if (specName == null) {
 	        		throw new IllegalArgumentException("Spec does not have a name");
 	        	}
-				else if(specName != null && !m.matches()) {
-					throw new IllegalArgumentException(format("Spec should be in %s format", pattern));
-				}
 				if (doesSpecExist(buildProfile, specName)) {
 					switch (buildOption) {
 						case create:
@@ -194,7 +226,7 @@ public class SpecsMojo extends ApiHubAbstractMojo {
 						case update:
 							logger.info(format("Spec \"%s\" already exists. Updating.", specName));
 							//update
-							doUpdate(buildProfile, specName, spec);
+							doUpdate(buildProfile, spec);
 							break;
 						case delete:
 							logger.info(format("Spec \"%s\" already exists. Deleting.", specName));
@@ -207,7 +239,7 @@ public class SpecsMojo extends ApiHubAbstractMojo {
 							doDelete(buildProfile, specName);
 							logger.info(format("Creating Spec - %s", specName));
 							//create
-							doCreate(buildProfile, specName, spec);
+							doCreate(buildProfile, specName, specId, spec);
 							break;
 					}
 				} else {
@@ -217,7 +249,7 @@ public class SpecsMojo extends ApiHubAbstractMojo {
 	                    case update:
 	                    	logger.info(format("Creating Spec - %s", specName));
 	                    	//create
-	                    	doCreate(buildProfile, specName, spec);
+	                    	doCreate(buildProfile, specName, specId, spec);
 							break;
 	                    case delete:
                             logger.info(format("Spec \"%s\" does not exist. Skipping.", specName));
@@ -231,41 +263,112 @@ public class SpecsMojo extends ApiHubAbstractMojo {
 	}
 	
 	/**
+	 * 
+	 * @param profile
+	 * @throws MojoExecutionException
+	 */
+	public void exportSpecs(BuildProfile profile) throws MojoExecutionException {
+		Gson gson = new Gson();
+		ApiHubClient apiHubClient = null;
+		List<String> specsList = new ArrayList<String>();
+		try {
+			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
+			//Get the list of APIs
+			ListApisRequest request =
+					ListApisRequest.newBuilder()
+						.setParent(LocationName.of(profile.getProjectId(), profile.getLocation()).toString())
+						//.setFilter("display_name=\"foo\"")
+						.setPageSize(PluginConstants.PAGE_SIZE).build();
+			while (true) {
+				ListApisResponse response = apiHubClient.listApisCallable().call(request);
+				for (com.google.cloud.apihub.v1.Api api : response.getApisList()) {
+					//Get the list of API Versions
+					ListVersionsRequest verRequest =
+							ListVersionsRequest.newBuilder()
+								.setParent(api.getName())
+								//.setFilter("display_name=\"API 1\"")
+								.setPageSize(PluginConstants.PAGE_SIZE).build();
+					while (true) {
+						ListVersionsResponse verResponse = apiHubClient.listVersionsCallable().call(verRequest);
+						for (com.google.cloud.apihub.v1.Version version : verResponse.getVersionsList()) {
+							// Get the list of Specs
+							ListSpecsRequest specRequest =
+									ListSpecsRequest.newBuilder()
+									.setParent(version.getName())
+									//.setFilter("display_name=\"API 1\"")
+									.setPageSize(PluginConstants.PAGE_SIZE).build();
+							while (true) {
+								ListSpecsResponse specResponse = apiHubClient.listSpecsCallable().call(specRequest);
+								for (com.google.cloud.apihub.v1.Spec spec : specResponse.getSpecsList()) {
+									SpecContents specContentResponse = apiHubClient.getSpecContents(spec.getName());
+									String specContentStr = ProtoJsonUtil.toJson(specContentResponse);
+									JsonObject jsonObject1 = gson.fromJson(specContentStr, JsonObject.class);
+							    	String specStr = ProtoJsonUtil.toJson(spec);
+							    	JsonObject jsonObject2 = gson.fromJson(specStr, JsonObject.class);
+							    	jsonObject2.remove("createTime");
+							    	jsonObject2.remove("updateTime");
+							    	jsonObject2.remove("details");
+							    	jsonObject2.remove("lintResponse");
+							    	jsonObject2.add("contents", jsonObject1);
+							    	String newStr = gson.toJson(jsonObject2);
+							    	newStr = PluginUtils.replacer(newStr, PluginConstants.PATTERN1, format("projects/%s/locations/%s", PluginConstants.PROJECT_ID, PluginConstants.LOCATION));
+							    	specsList.add(newStr);
+							    }
+								String specNextPageToken = specResponse.getNextPageToken();
+							     if (!Strings.isNullOrEmpty(specNextPageToken)) {
+							    	 specRequest = specRequest.toBuilder().setPageToken(specNextPageToken).build();
+							     } else {
+							       break;
+							     }
+							}
+						}
+						String verNextPageToken = verResponse.getNextPageToken();
+						if (!Strings.isNullOrEmpty(verNextPageToken)) {
+							verRequest = verRequest.toBuilder().setPageToken(verNextPageToken).build();
+					    } else {
+					       break;
+					    }
+					}
+				}
+				String nextPageToken = response.getNextPageToken();
+				if (!Strings.isNullOrEmpty(nextPageToken)) {
+			       request = request.toBuilder().setPageToken(nextPageToken).build();
+			    } else {
+			       break;
+			    }
+		   }
+			PluginUtils.exportToFile(specsList, profile.getConfigExportDir(), "specs");
+		}catch (Exception e) {
+			throw new RuntimeException(e.getMessage());
+		}
+		finally {
+			apiHubClient.close();
+		}
+	}
+	
+	/**
 	 * Create Spec
 	 * @param specName
+	 * @param specId
 	 * @param specStr
 	 * @throws MojoExecutionException
 	 */
-	public void doCreate(BuildProfile profile, String specName, String specStr) throws MojoExecutionException {
+	public void doCreate(BuildProfile profile, String specName, String specId, String specStr) throws MojoExecutionException {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-			
-			//parse the {api}/versions/{version}/specs/{spec}
-			String pattern = "^([a-zA-Z0-9-_]+)\\/versions\\/([a-zA-Z0-9-_]+)\\/specs\\/([a-zA-Z0-9-_]+)$"; //{api}/versions/{version}/specs/{spec}
+			//parse projects/PROJECT_ID/locations/LOCATION/apis/{api}/versions/{version}/specs/{spec} to get api and version
+			String pattern = ".*\\/apis\\/([a-zA-Z0-9-_]+)\\/versions\\/([a-zA-Z0-9-_]+).*";
 			Pattern p = Pattern.compile(pattern);
 			Matcher m = p.matcher(specName);
 			if(m.matches()) {
 				String apiName = m.group(1);
 				String version = m.group(2);
-				String specId = m.group(3);
 				
 				VersionName parent = VersionName.of(profile.getProjectId(), profile.getLocation(), apiName, version);
-				
-				//replace the name field from {api}/versions/{version}/specs/{spec} to {spec}
-				specStr = FQDNHelper.replaceFQDNJsonValue("$.name", specId, specStr);
-				
-				//update attributes with FQDN if exist
-				specStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", specStr);
-				
-				//update specType with FQDN if exist
-				specStr = FQDNHelper.updateFQDNJsonValue("$.specType.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),specStr);
-			
-				
 				com.google.cloud.apihub.v1.Spec specObj = ProtoJsonUtil.fromJson(specStr, com.google.cloud.apihub.v1.Spec.class);
 				apiHubClient.createSpec(parent, specObj, specId);
-			    logger.info("Create success");
-				
+				logger.info("Create success");
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -283,7 +386,7 @@ public class SpecsMojo extends ApiHubAbstractMojo {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-			apiHubClient.deleteSpec(format("projects/%s/locations/%s/apis/%s", profile.getProjectId(), profile.getLocation(), specName));
+			apiHubClient.deleteSpec(specName);
 		    logger.info("Delete success");
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -294,28 +397,13 @@ public class SpecsMojo extends ApiHubAbstractMojo {
 	/**
 	 * Update Spec
 	 * @param profile
-	 * @param specName
 	 * @param specStr
 	 * @throws MojoExecutionException
 	 */
-	public void doUpdate(BuildProfile profile, String specName, String specStr) throws MojoExecutionException {
+	public void doUpdate(BuildProfile profile, String specStr) throws MojoExecutionException {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-			
-			//updating the name field in the spec object to projects/{project}/locations/{location}/apis/{api}/versions/{version}/specs/{spec} format as its required by the updateSpec method
-			specStr = FQDNHelper.updateFQDNJsonValue("$.name", 
-											format("projects/%s/locations/%s/apis", profile.getProjectId(), profile.getLocation()), 
-											specStr);
-			
-			//update attributes with FQDN if exist
-			specStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", specStr);
-
-			//update specType with FQDN if exist
-			specStr = FQDNHelper.updateFQDNJsonValue("$.specType.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),specStr);
-		
-			logger.debug("after modifying: "+ specStr);
-			
 			com.google.cloud.apihub.v1.Spec specObj = ProtoJsonUtil.fromJson(specStr, com.google.cloud.apihub.v1.Spec.class);
 			List<String> fieldMaskValues = new ArrayList<>();
 			fieldMaskValues.add("display_name");
@@ -348,7 +436,7 @@ public class SpecsMojo extends ApiHubAbstractMojo {
 		try {
         	logger.info("Checking if Spec - " +specName + " exist");
         	ApiHubClient apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-        	com.google.cloud.apihub.v1.Spec specResponse = apiHubClient.getSpec(format("projects/%s/locations/%s/apis/%s", profile.getProjectId(), profile.getLocation(), specName));
+        	com.google.cloud.apihub.v1.Spec specResponse = apiHubClient.getSpec(specName);
         	if(specResponse == null) 
             	return false;
         }
