@@ -262,14 +262,15 @@ public class DeploymentsMojo extends ApiHubAbstractMojo {
 		    	 deploymentStr = PluginUtils.replacer(deploymentStr, PluginConstants.PATTERN1, format("projects/%s/locations/%s", PluginConstants.PROJECT_ID, PluginConstants.LOCATION));
 		    	 deploymentList.add(deploymentStr);
 		     }
-		     PluginUtils.exportToFile(deploymentList, profile.getConfigExportDir(), "deployments");
 		     String nextPageToken = response.getNextPageToken();
+		     logger.debug("nextPageToken: "+ nextPageToken);
 		     if (!Strings.isNullOrEmpty(nextPageToken)) {
 		       request = request.toBuilder().setPageToken(nextPageToken).build();
 		     } else {
 		       break;
 		     }
 		   }
+			PluginUtils.exportToFile(deploymentList, profile.getConfigExportDir(), "deployments");
 		}catch (Exception e) {
 			throw new RuntimeException(e.getMessage());
 		}

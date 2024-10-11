@@ -263,14 +263,15 @@ public class AttributesMojo extends ApiHubAbstractMojo {
 		    	 attrStr = PluginUtils.replacer(attrStr, PluginConstants.PATTERN1, format("projects/%s/locations/%s", PluginConstants.PROJECT_ID, PluginConstants.LOCATION));
 		    	 attributesList.add(attrStr);
 		     }
-		     PluginUtils.exportToFile(attributesList, profile.getConfigExportDir(), "attributes");
 		     String nextPageToken = response.getNextPageToken();
+		     logger.debug("nextPageToken: "+ nextPageToken);
 		     if (!Strings.isNullOrEmpty(nextPageToken)) {
 		       request = request.toBuilder().setPageToken(nextPageToken).build();
 		     } else {
 		       break;
 		     }
 		   }
+			PluginUtils.exportToFile(attributesList, profile.getConfigExportDir(), "attributes");
 		}catch (Exception e) {
 			throw new RuntimeException(e.getMessage());
 		}
