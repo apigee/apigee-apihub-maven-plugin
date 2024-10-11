@@ -1,6 +1,6 @@
 [
    {
-      "name":"projects/PROJECT_ID/locations/someregion/apis/api1",
+      "name":"projects/PROJECT_ID/locations/LOCATION/apis/api1",
       "displayName":"API 1",
       "description":"API 1",
       "documentation":{
@@ -11,7 +11,7 @@
          "email":"api1-owner@example.com"
       },
       "targetUser":{
-         "attribute":"projects/PROJECT_ID/locations/someregion/attributes/system-target-user",
+         "attribute":"projects/PROJECT_ID/locations/LOCATION/attributes/system-target-user",
          "enumValues":{
             "values":[
                {
@@ -21,7 +21,7 @@
          }
       },
       "team":{
-         "attribute":"projects/PROJECT_ID/locations/someregion/attributes/system-team",
+         "attribute":"projects/PROJECT_ID/locations/LOCATION/attributes/system-team",
          "enumValues":{
             "values":[
                {
@@ -31,7 +31,7 @@
          }
       },
       "businessUnit":{
-         "attribute":"projects/PROJECT_ID/locations/someregion/attributes/system-business-unit",
+         "attribute":"projects/PROJECT_ID/locations/LOCATION/attributes/system-business-unit",
          "enumValues":{
             "values":[
                {
@@ -41,7 +41,7 @@
          }
       },
       "maturityLevel":{
-         "attribute":"projects/PROJECT_ID/locations/someregion/attributes/system-maturity-level",
+         "attribute":"projects/PROJECT_ID/locations/LOCATION/attributes/system-maturity-level",
          "enumValues":{
             "values":[
                {
@@ -51,7 +51,7 @@
          }
       },
       "apiStyle":{
-         "attribute":"projects/PROJECT_ID/locations/someregion/attributes/system-api-style",
+         "attribute":"projects/PROJECT_ID/locations/LOCATION/attributes/system-api-style",
          "enumValues":{
             "values":[
                {
@@ -61,8 +61,8 @@
          }
       },
       "attributes":{
-         "projects/PROJECT_ID/locations/someregion/attributes/sample-attribute10":{
-            "attribute":"projects/PROJECT_ID/locations/someregion/attributes/sample-attribute10",
+         "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute10":{
+            "attribute":"projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute10",
             "stringValues":{
                "values":[
                   "Test"
