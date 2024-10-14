@@ -26,6 +26,7 @@ public final class PluginConstants {
 	public static final String[] REMOVE_FIELDS = {"createTime", "updateTime", "details", 
 													"lintResponse", "versions", "apiVersions", 
 													"state", "discoveryMode", "errorDetail",
-													"definitionType", "mandatory"
+													"definitionType", "mandatory", "specs",
+													"apiOperations", "definitions"
 												};
 }
