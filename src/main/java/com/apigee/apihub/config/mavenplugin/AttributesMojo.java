@@ -18,6 +18,7 @@ package com.apigee.apihub.config.mavenplugin;
 
 import static java.lang.String.format;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -136,6 +137,12 @@ public class AttributesMojo extends ApiHubAbstractMojo {
 			}
 			if (buildOption.equals(OPTIONS.export) && buildProfile.getConfigExportDir() == null) {
 				throw new MojoExecutionException("Confile Export Dir is missing");
+			}
+			if (buildOption.equals(OPTIONS.export) && buildProfile.getConfigExportDir() != null) {
+				File f = new File(buildProfile.getConfigExportDir());
+				if (!f.exists() || !f.isDirectory()) {
+					throw new MojoExecutionException("Export Dir is not created or is incorrect");
+				}
 			}
 			 
 
