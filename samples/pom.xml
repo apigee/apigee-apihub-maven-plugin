@@ -104,7 +104,6 @@
 				<apigee.apihub.projectId>${projectId}</apigee.apihub.projectId> <!-- GCP Project ID where Apigee API hub is provisioned -->
 				<apigee.apihub.location>${location}</apigee.apihub.location> <!-- Apigee API hub location. Default is global -->
 				<apigee.apihub.config.dir>./</apigee.apihub.config.dir> <!-- Directory where specs are accessible. Using ./specs for sample -->
-				<apigee.apihub.config.file>./api-config.yaml</apigee.apihub.config.file> <!-- Path to the API configuration yaml-->
 				<apigee.apihub.config.options>${options}</apigee.apihub.config.options> <!-- Options like none, create, update, delete, sync. Default is none-->
 				<apigee.apihub.serviceaccount.file>${file}</apigee.apihub.serviceaccount.file> <!-- Service Account File. Use this or "apigee.apihub.bearer". Service Account takes precedence -->
 				<apigee.apihub.bearer>${bearer}</apigee.apihub.bearer> <!-- Bearer Token. Use this or  "apigee.apihub.serviceaccount.file" -->
