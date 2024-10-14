@@ -1,6 +1,6 @@
 [
    {
-      "name":"externalApi1",
+      "name":"projects/PROJECT_ID/locations/LOCATION/externalApis/externalApi1",
       "displayName":"externalApi1",
       "description":"External API 1",
       "endpoints":[
@@ -13,14 +13,14 @@
          "externalUri":"https://api-docs.externalapi.com"
       },
       "attributes":{
-         "sample-attribute6":{
+         "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute6":{
             "stringValues":{
                "values":[
                   "extValue"
                ]
             }
          },
-         "sample-attribute7":{
+         "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute7":{
             "stringValues":{
                "values":[
                   "extValue"
@@ -30,7 +30,7 @@
       }
    },
    {
-      "name":"externalApi2",
+      "name":"projects/PROJECT_ID/locations/LOCATION/externalApis/externalApi2",
       "displayName":"externalApi2",
       "description":"External API 2",
       "endpoints":[

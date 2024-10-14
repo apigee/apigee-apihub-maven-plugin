@@ -23,10 +23,12 @@ public class BuildProfile {
 	private String location;
 	private String options;
 	private String configDir;
+	private String configExportDir;
 	private String configFile;
 	private String specDirectory; // Directory holding specs
 	private String serviceAccountFilePath;
 	private String bearer;
+	private boolean forceDelete;
 	/**
 	 * @return the projectId
 	 */
@@ -76,6 +78,18 @@ public class BuildProfile {
 		this.configDir = configDir;
 	}
 	/**
+	 * @return the configExportDir
+	 */
+	public String getConfigExportDir() {
+		return configExportDir;
+	}
+	/**
+	 * @param configExportDir the configExportDir to set
+	 */
+	public void setConfigExportDir(String configExportDir) {
+		this.configExportDir = configExportDir;
+	}
+	/**
 	 * @return the configFile
 	 */
 	public String getConfigFile() {
@@ -123,7 +137,17 @@ public class BuildProfile {
 	public void setBearer(String bearer) {
 		this.bearer = bearer;
 	}
-	
-	
+	/**
+	 * @return the forceDelete
+	 */
+	public boolean getForceDelete() {
+		return forceDelete;
+	}
+	/**
+	 * @param forceDelete the forceDelete to set
+	 */
+	public void setForceDelete(boolean forceDelete) {
+		this.forceDelete = forceDelete;
+	}
 
 }

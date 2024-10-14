@@ -13,7 +13,8 @@ The [samples folder](./samples) provides a README with Getting Started steps and
 
 ## Prerequisites
 You will need the following to run the samples:
-- Apigee Edge developer account (in an Apigee hybrid org)
+- Apigee API hub provisioned
+- Apigee API hub admin role
 - [Java SDK >= 8](http://www.oracle.com/technetwork/java/javase/downloads/index.html)
 - [Maven 3.x](https://maven.apache.org/)
 
@@ -38,19 +39,34 @@ mvn install -P<profile> -Dapigee.apihub.config.dir=$path -Dapigee.apihub.config.
 #### Options
 
 ```
--P<profile>
-    Pick a profile in the parent pom.xml (shared-pom.xml in the example).
-    Apigee org and env information comes from the profile.
-    
--Dapigee.apihub.config.options
+mvn install -P{profile} -DprojectId=${project} -Dfile={path}
+
+  # Options
+
+  -P<profile>
+    Pick a profile in the pom.xml.
+    Apigee API Hub location, config directory, option are picked from the profile.
+
+  -Dapigee.apihub.config.options
     none   - No action (default)
     create - Create when not found. Pre-existing config is NOT updated even if it is different.
     update - Update when found; create when not found
     delete - Delete when found
+    export - export all entities to a file
     sync   - Delete and recreate.
-
--Dapigee.apihub.config.dir
-    path to the directory containing the configuration
+    
+  -Dapigee.apihub.config.dir
+  	path to the directory containing the configuration
+  
+  -Dapigee.apihub.config.exportDir
+  	path to the directory where the entities will be exported to
+  	
+  -Dapigee.apihub.force.delete
+  	set this flag to true to forcefully delete all dependent entities (applicable for apis and apiversions)
+  
+  -Dbearer
+  	access token. Service Account file takes precedence
+    
 ```
 
 #### Individual goals

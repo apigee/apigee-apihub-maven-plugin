@@ -18,6 +18,7 @@ package com.apigee.apihub.config.mavenplugin;
 
 import static java.lang.String.format;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,13 +32,17 @@ import org.json.simple.parser.ParseException;
 import com.apigee.apihub.config.utils.ApiHubClientSingleton;
 import com.apigee.apihub.config.utils.BuildProfile;
 import com.apigee.apihub.config.utils.ConfigReader;
-import com.apigee.apihub.config.utils.FQDNHelper;
+import com.apigee.apihub.config.utils.PluginConstants;
+import com.apigee.apihub.config.utils.PluginUtils;
 import com.apigee.apihub.config.utils.ProtoJsonUtil;
 import com.google.api.client.util.Key;
+import com.google.api.client.util.Strings;
 import com.google.api.gax.rpc.ApiException;
 import com.google.api.gax.rpc.StatusCode.Code;
 import com.google.cloud.apihub.v1.ApiHubClient;
 import com.google.cloud.apihub.v1.ExternalApiName;
+import com.google.cloud.apihub.v1.ListExternalApisRequest;
+import com.google.cloud.apihub.v1.ListExternalApisResponse;
 import com.google.cloud.apihub.v1.LocationName;
 import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
@@ -56,7 +61,7 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	public static final String ____ATTENTION_MARKER____ = "************************************************************************";
 
 	enum OPTIONS {
-		none, create, update, delete, sync
+		none, create, update, delete, sync, export
 	}
 
 	OPTIONS buildOption = OPTIONS.none;
@@ -81,7 +86,9 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 		Gson gson = new Gson();
 		try {
 			ExternalApi externalApi = gson.fromJson(payload, ExternalApi.class);
-			return externalApi.name;
+			String[] parts = externalApi.name.split("/");
+			String externalApiName = parts[parts.length - 1];
+			return externalApiName;
 		} catch (JsonParseException e) {
 		  throw new MojoFailureException(e.getMessage());
 		}
@@ -125,6 +132,18 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 			if (buildProfile.getConfigDir() == null) {
 				throw new MojoExecutionException("API Confile Dir is missing");
 			}
+			if (!buildOption.equals(OPTIONS.export) && buildProfile.getConfigDir() == null) {
+				throw new MojoExecutionException("API Confile Dir is missing");
+			}
+			if (buildOption.equals(OPTIONS.export) && buildProfile.getConfigExportDir() == null) {
+				throw new MojoExecutionException("Confile Export Dir is missing");
+			}
+			if (buildOption.equals(OPTIONS.export) && buildProfile.getConfigExportDir() != null) {
+				File f = new File(buildProfile.getConfigExportDir());
+				if (!f.exists() || !f.isDirectory()) {
+					throw new MojoExecutionException("Export Dir is not created or is incorrect");
+				}
+			}
 			 
 
 		} catch (IllegalArgumentException e) {
@@ -146,9 +165,14 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 
 		try {
 			init();
-			logger.info(format("Fetching externalApis.json file from %s directory", buildProfile.getConfigDir()));
-			List<String> externalApis = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/externalApis.json");
-			processExternalApis(externalApis);
+			if(buildOption == OPTIONS.export) {
+				logger.info(format("Exporting externalApis.json file to %s directory", buildProfile.getConfigExportDir()));
+				exportExternalApis(buildProfile);
+			} else {
+				logger.info(format("Fetching externalApis.json file from %s directory", buildProfile.getConfigDir()));
+				List<String> externalApis = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/externalApis.json");
+				processExternalApis(externalApis);
+			}
 
 		} catch (MojoFailureException e) {
 			throw e;
@@ -175,6 +199,7 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 					return;
 			}
 			for (String externalApi : externalApis) {
+				externalApi = PluginUtils.replacer(externalApi, PluginConstants.PATTERN, format("projects/%s/locations/%s", buildProfile.getProjectId(), buildProfile.getLocation()));
 				String externalApiName = getExternalApiName(externalApi);
 				if (externalApiName == null) {
 	        		throw new IllegalArgumentException("External API does not have a name");
@@ -187,7 +212,7 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 						case update:
 							logger.info(format("External API \"%s\" already exists. Updating.", externalApiName));
 							//update
-							doUpdate(buildProfile, externalApiName, externalApi);
+							doUpdate(buildProfile, externalApi);
 							break;
 						case delete:
 							logger.info(format("External API \"%s\" already exists. Deleting.", externalApiName));
@@ -224,6 +249,45 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	}
 	
 	/**
+	 * 
+	 * @param profile
+	 * @throws MojoExecutionException
+	 */
+	public void exportExternalApis(BuildProfile profile) throws MojoExecutionException {
+		ApiHubClient apiHubClient = null;
+		List<String> externalApiList = new ArrayList<String>();
+		try {
+			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
+			ListExternalApisRequest request =
+					ListExternalApisRequest.newBuilder()
+					.setParent(LocationName.of(profile.getProjectId(), profile.getLocation()).toString())
+					//.setFilter("display_name=\"API 1\"")
+					.setPageSize(PluginConstants.PAGE_SIZE).build();
+			while (true) {
+		     ListExternalApisResponse response = apiHubClient.listExternalApisCallable().call(request);
+		     for (com.google.cloud.apihub.v1.ExternalApi api : response.getExternalApisList()) {
+		    	 String apiStr = ProtoJsonUtil.toJson(api);
+		    	 apiStr = PluginUtils.replacer(apiStr, PluginConstants.PATTERN1, format("projects/%s/locations/%s", PluginConstants.PROJECT_ID, PluginConstants.LOCATION));
+		    	 externalApiList.add(PluginUtils.cleanseResponse(apiStr));
+		     }
+		     String nextPageToken = response.getNextPageToken();
+		     logger.debug("nextPageToken: "+ nextPageToken);
+		     if (!Strings.isNullOrEmpty(nextPageToken)) {
+		       request = request.toBuilder().setPageToken(nextPageToken).build();
+		     } else {
+		       break;
+		     }
+		   }
+			PluginUtils.exportToFile(externalApiList, profile.getConfigExportDir(), "externalApis");
+		}catch (Exception e) {
+			throw new RuntimeException(e.getMessage());
+		}
+		finally {
+			apiHubClient.close();
+		}
+	}
+	
+	/**
 	 * Create External API
 	 * @param externalApiName
 	 * @param externalApiStr
@@ -234,10 +298,6 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
 			LocationName parent = LocationName.of(profile.getProjectId(), profile.getLocation());
-			
-			//update attributes with FQDN if exist
-			externalApiStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", externalApiStr);
-			
 			com.google.cloud.apihub.v1.ExternalApi externalApipObj = ProtoJsonUtil.fromJson(externalApiStr, com.google.cloud.apihub.v1.ExternalApi.class);
 		    apiHubClient.createExternalApi(parent, externalApipObj, externalApiName);
 		    logger.info("Create success");
@@ -269,24 +329,13 @@ public class ExternalApisMojo extends ApiHubAbstractMojo {
 	/**
 	 * Update External API
 	 * @param profile
-	 * @param externalApiName
 	 * @param externalApiStr
 	 * @throws MojoExecutionException
 	 */
-	public void doUpdate(BuildProfile profile, String externalApiName, String externalApiStr) throws MojoExecutionException {
+	public void doUpdate(BuildProfile profile, String externalApiStr) throws MojoExecutionException {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-			
-			//updating the name field in the attribute object to projects/{project}/locations/{location}/attributes/{attribute} format as its required by the updateAttribute method
-			externalApiStr = FQDNHelper.updateFQDNJsonValue("$.name", 
-															format("projects/%s/locations/%s/externalApis", profile.getProjectId(), profile.getLocation()), 
-															externalApiStr);
-			
-			//update attributes with FQDN if exist
-			externalApiStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", externalApiStr);
-			
-			
 			com.google.cloud.apihub.v1.ExternalApi externalApiObj = ProtoJsonUtil.fromJson(externalApiStr, com.google.cloud.apihub.v1.ExternalApi.class);
 			List<String> fieldMaskValues = new ArrayList<>();
 			fieldMaskValues.add("display_name");

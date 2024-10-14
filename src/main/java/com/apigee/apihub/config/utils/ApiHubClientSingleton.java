@@ -58,14 +58,16 @@ public class ApiHubClientSingleton {
 			}
 			//apihub
 			if(clientType!=null && clientType.equals("apis")) {
-				ApiHubSettings hubSettings = ApiHubSettings.newHttpJsonBuilder()
-						.setCredentialsProvider(FixedCredentialsProvider.create(credentials)).build();
+				ApiHubSettings hubSettings = ApiHubSettings.newBuilder()
+	            .setCredentialsProvider(FixedCredentialsProvider.create(credentials))
+	            .build();
 				setApiHubClient(ApiHubClient.create(hubSettings));
 			}
 			//dependencies
 			if(clientType!=null && clientType.equals("dependencies")) {
-				ApiHubDependenciesSettings hubDependenciesSettings = ApiHubDependenciesSettings.newHttpJsonBuilder()
-						.setCredentialsProvider(FixedCredentialsProvider.create(credentials)).build();
+				ApiHubDependenciesSettings hubDependenciesSettings = ApiHubDependenciesSettings.newBuilder()
+			            .setCredentialsProvider(FixedCredentialsProvider.create(credentials))
+			            .build();
 				setApiHubDependenciesClient(ApiHubDependenciesClient.create(hubDependenciesSettings));
 			}
 			

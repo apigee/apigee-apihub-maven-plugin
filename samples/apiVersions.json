@@ -1,16 +1,16 @@
 [
    {
-      "name":"api1/versions/version-1",
+      "name":"projects/PROJECT_ID/locations/LOCATION/apis/api1/versions/version-1",
       "displayName":"version-1",
       "description":"version-1",
       "documentation":{
          "externalUri":"https://api-docs.example.com"
       },
       "deployments":[
-         "deployment1"
+         "projects/PROJECT_ID/locations/LOCATION/deployments/deployment1"
       ],
       "lifecycle":{
-         "attribute":"system-lifecycle",
+         "attribute":"projects/PROJECT_ID/locations/LOCATION/attributes/system-lifecycle",
          "enumValues":{
             "values":[
                {
@@ -20,7 +20,7 @@
          }
       },
       "attributes":{
-         "sample-attribute1":{
+         "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute1":{
             "enumValues":{
                "values":[
                   {
@@ -30,17 +30,17 @@
             }
          }
       },
-      "selectedDeployment":"deployment1"
+      "selectedDeployment":"projects/PROJECT_ID/locations/LOCATION/deployments/deployment1"
    },
    {
-      "name":"api1/versions/version-2",
+      "name":"projects/PROJECT_ID/locations/LOCATION/apis/api1/versions/version-2",
       "displayName":"version-2",
       "description":"version-2",
       "documentation":{
          "externalUri":"https://api-docs.example.com"
       },
       "lifecycle":{
-         "attribute":"system-lifecycle",
+         "attribute":"projects/PROJECT_ID/locations/LOCATION/attributes/system-lifecycle",
          "enumValues":{
             "values":[
                {

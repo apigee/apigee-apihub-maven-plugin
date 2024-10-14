@@ -18,6 +18,7 @@ package com.apigee.apihub.config.mavenplugin;
 
 import static java.lang.String.format;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,13 +32,17 @@ import org.json.simple.parser.ParseException;
 import com.apigee.apihub.config.utils.ApiHubClientSingleton;
 import com.apigee.apihub.config.utils.BuildProfile;
 import com.apigee.apihub.config.utils.ConfigReader;
-import com.apigee.apihub.config.utils.FQDNHelper;
+import com.apigee.apihub.config.utils.PluginConstants;
+import com.apigee.apihub.config.utils.PluginUtils;
 import com.apigee.apihub.config.utils.ProtoJsonUtil;
 import com.google.api.client.util.Key;
+import com.google.api.client.util.Strings;
 import com.google.api.gax.rpc.ApiException;
 import com.google.api.gax.rpc.StatusCode.Code;
 import com.google.cloud.apihub.v1.ApiHubDependenciesClient;
 import com.google.cloud.apihub.v1.DependencyName;
+import com.google.cloud.apihub.v1.ListDependenciesRequest;
+import com.google.cloud.apihub.v1.ListDependenciesResponse;
 import com.google.cloud.apihub.v1.LocationName;
 import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
@@ -56,7 +61,7 @@ public class DependenciesMojo extends ApiHubAbstractMojo {
 	public static final String ____ATTENTION_MARKER____ = "************************************************************************";
 
 	enum OPTIONS {
-		none, create, update, delete, sync
+		none, create, update, delete, sync, export
 	}
 
 	OPTIONS buildOption = OPTIONS.none;
@@ -81,7 +86,9 @@ public class DependenciesMojo extends ApiHubAbstractMojo {
 		Gson gson = new Gson();
 		try {
 			Dependency dependency = gson.fromJson(payload, Dependency.class);
-			return dependency.name;
+			String[] parts = dependency.name.split("/");
+			String dependencyName = parts[parts.length - 1];
+			return dependencyName;
 		} catch (JsonParseException e) {
 		  throw new MojoFailureException(e.getMessage());
 		}
@@ -125,6 +132,18 @@ public class DependenciesMojo extends ApiHubAbstractMojo {
 			if (buildProfile.getConfigDir() == null) {
 				throw new MojoExecutionException("API Confile Dir is missing");
 			}
+			if (!buildOption.equals(OPTIONS.export) && buildProfile.getConfigDir() == null) {
+				throw new MojoExecutionException("API Confile Dir is missing");
+			}
+			if (buildOption.equals(OPTIONS.export) && buildProfile.getConfigExportDir() == null) {
+				throw new MojoExecutionException("Confile Export Dir is missing");
+			}
+			if (buildOption.equals(OPTIONS.export) && buildProfile.getConfigExportDir() != null) {
+				File f = new File(buildProfile.getConfigExportDir());
+				if (!f.exists() || !f.isDirectory()) {
+					throw new MojoExecutionException("Export Dir is not created or is incorrect");
+				}
+			}
 			 
 
 		} catch (IllegalArgumentException e) {
@@ -146,9 +165,14 @@ public class DependenciesMojo extends ApiHubAbstractMojo {
 
 		try {
 			init();
-			logger.info(format("Fetching dependencies.json file from %s directory", buildProfile.getConfigDir()));
-			List<String> dependencies = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/dependencies.json");
-			processDependencies(dependencies);
+			if(buildOption == OPTIONS.export) {
+				logger.info(format("Exporting dependencies.json file to %s directory", buildProfile.getConfigExportDir()));
+				exportDependencies(buildProfile);
+			} else {
+				logger.info(format("Fetching dependencies.json file from %s directory", buildProfile.getConfigDir()));
+				List<String> dependencies = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/dependencies.json");
+				processDependencies(dependencies);
+			}
 
 		} catch (MojoFailureException e) {
 			throw e;
@@ -175,6 +199,7 @@ public class DependenciesMojo extends ApiHubAbstractMojo {
 					return;
 			}
 			for (String dependency : dependencies) {
+				dependency = PluginUtils.replacer(dependency, PluginConstants.PATTERN, format("projects/%s/locations/%s", buildProfile.getProjectId(), buildProfile.getLocation()));
 				String dependencyName = getDependencyName(dependency);
 				if (dependencyName == null) {
 	        		throw new IllegalArgumentException("Dependency does not have a name");
@@ -187,7 +212,7 @@ public class DependenciesMojo extends ApiHubAbstractMojo {
 						case update:
 							logger.info(format("Dependency \"%s\" already exists. Updating.", dependencyName));
 							//update
-							doUpdate(buildProfile, dependencyName, dependency);
+							doUpdate(buildProfile, dependency);
 							break;
 						case delete:
 							logger.info(format("Dependency \"%s\" already exists. Deleting.", dependencyName));
@@ -224,6 +249,45 @@ public class DependenciesMojo extends ApiHubAbstractMojo {
 	}
 	
 	/**
+	 * 
+	 * @param profile
+	 * @throws MojoExecutionException
+	 */
+	public void exportDependencies(BuildProfile profile) throws MojoExecutionException {
+		ApiHubDependenciesClient apiHubDependenciesClient = null;
+		List<String> dependenciesList = new ArrayList<String>();
+		try {
+			apiHubDependenciesClient = ApiHubClientSingleton.getDependenciesInstance(profile).getApiHubDependenciesClient();
+			ListDependenciesRequest request =
+					ListDependenciesRequest.newBuilder()
+					.setParent(LocationName.of(profile.getProjectId(), profile.getLocation()).toString())
+					//.setFilter("display_name=\"API 1\"")
+					.setPageSize(PluginConstants.PAGE_SIZE).build();
+			while (true) {
+		     ListDependenciesResponse response = apiHubDependenciesClient.listDependenciesCallable().call(request);
+		     for (com.google.cloud.apihub.v1.Dependency dependency : response.getDependenciesList()) {
+		    	 String dependencyStr = ProtoJsonUtil.toJson(dependency);
+		    	 dependencyStr = PluginUtils.replacer(dependencyStr, PluginConstants.PATTERN1, format("projects/%s/locations/%s", PluginConstants.PROJECT_ID, PluginConstants.LOCATION));
+		    	 dependenciesList.add(PluginUtils.cleanseResponse(dependencyStr));
+		     }
+		     String nextPageToken = response.getNextPageToken();
+		     logger.debug("nextPageToken: "+ nextPageToken);
+		     if (!Strings.isNullOrEmpty(nextPageToken)) {
+		       request = request.toBuilder().setPageToken(nextPageToken).build();
+		     } else {
+		       break;
+		     }
+		   }
+			PluginUtils.exportToFile(dependenciesList, profile.getConfigExportDir(), "dependencies");
+		}catch (Exception e) {
+			throw new RuntimeException(e.getMessage());
+		}
+		finally {
+			apiHubDependenciesClient.close();
+		}
+	}
+	
+	/**
 	 * Create Dependency
 	 * @param dependencyName
 	 * @param dependencyStr
@@ -234,29 +298,6 @@ public class DependenciesMojo extends ApiHubAbstractMojo {
 		try {
 			apiHubDependenciesClient = ApiHubClientSingleton.getDependenciesInstance(profile).getApiHubDependenciesClient();
 			LocationName parent = LocationName.of(profile.getProjectId(), profile.getLocation());
-			
-			//update attributes with FQDN if exist
-			dependencyStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", dependencyStr);
-			
-			//update externalApiResourceName for consumer and supplier
-			dependencyStr = FQDNHelper.updateFQDNJsonValue("$.consumer.externalApiResourceName", 
-												format("projects/%s/locations/%s", profile.getProjectId(), profile.getLocation()), 
-												dependencyStr);
-			dependencyStr = FQDNHelper.updateFQDNJsonValue("$.supplier.externalApiResourceName", 
-												format("projects/%s/locations/%s", profile.getProjectId(), profile.getLocation()), 
-												dependencyStr);
-			
-			//update operationResourceName for consumer and supplier
-			dependencyStr = FQDNHelper.updateFQDNJsonValue("$.consumer.operationResourceName", 
-												format("projects/%s/locations/%s", profile.getProjectId(), profile.getLocation()),
-												dependencyStr);
-			dependencyStr = FQDNHelper.updateFQDNJsonValue("$.supplier.operationResourceName", 
-												format("projects/%s/locations/%s", profile.getProjectId(), profile.getLocation()), 
-												dependencyStr);
-			
-			logger.debug("after modifying: "+ dependencyStr);
-
-			
 			com.google.cloud.apihub.v1.Dependency dependencyObj = ProtoJsonUtil.fromJson(dependencyStr, com.google.cloud.apihub.v1.Dependency.class);
 			apiHubDependenciesClient.createDependency(parent, dependencyObj, dependencyName);
 		    logger.info("Create success");
@@ -288,41 +329,13 @@ public class DependenciesMojo extends ApiHubAbstractMojo {
 	/**
 	 * Update Dependency
 	 * @param profile
-	 * @param dependencyName
 	 * @param dependencyStr
 	 * @throws MojoExecutionException
 	 */
-	public void doUpdate(BuildProfile profile, String dependencyName, String dependencyStr) throws MojoExecutionException {
+	public void doUpdate(BuildProfile profile, String dependencyStr) throws MojoExecutionException {
 		ApiHubDependenciesClient apiHubDependenciesClient = null;
 		try {
 			apiHubDependenciesClient = ApiHubClientSingleton.getDependenciesInstance(profile).getApiHubDependenciesClient();
-			
-			//updating the name field in the dependency object to projects/{project}/locations/{location}/dependencies/{dependency} format as its required by the updateDependency method
-			dependencyStr = FQDNHelper.updateFQDNJsonValue("$.name", 
-											format("projects/%s/locations/%s/dependencies", profile.getProjectId(), profile.getLocation()), 
-											dependencyStr);
-			
-			//update attributes with FQDN if exist
-			dependencyStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", dependencyStr);
-			
-			//update externalApiResourceName for consumer and supplier
-			dependencyStr = FQDNHelper.updateFQDNJsonValue("$.consumer.externalApiResourceName", 
-												format("projects/%s/locations/%s", profile.getProjectId(), profile.getLocation()), 
-												dependencyStr);
-			dependencyStr = FQDNHelper.updateFQDNJsonValue("$.supplier.externalApiResourceName", 
-												format("projects/%s/locations/%s", profile.getProjectId(), profile.getLocation()), 
-												dependencyStr);
-			
-			//update operationResourceName for consumer and supplier
-			dependencyStr = FQDNHelper.updateFQDNJsonValue("$.consumer.operationResourceName", 
-												format("projects/%s/locations/%s", profile.getProjectId(), profile.getLocation()),
-												dependencyStr);
-			dependencyStr = FQDNHelper.updateFQDNJsonValue("$.supplier.operationResourceName", 
-												format("projects/%s/locations/%s", profile.getProjectId(), profile.getLocation()), 
-												dependencyStr);
-			
-			logger.debug("after modifying: "+ dependencyStr);
-			
 			com.google.cloud.apihub.v1.Dependency dependencyObj = ProtoJsonUtil.fromJson(dependencyStr, com.google.cloud.apihub.v1.Dependency.class);
 			List<String> fieldMaskValues = new ArrayList<>();
 			fieldMaskValues.add("description");

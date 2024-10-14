@@ -1,22 +1,22 @@
 [
 	{
-	   "name":"dependency1",
+	   "name":"projects/PROJECT_ID/locations/LOCATION/dependencies/dependency1",
 	   "description": "Dependency 1",
 	   "consumer":{
-	      "externalApiResourceName":"externalApis/externalApi1"
+	      "externalApiResourceName":"projects/PROJECT_ID/locations/LOCATION/externalApis/externalApi1"
 	   },
 	   "supplier":{
-	      "externalApiResourceName":"externalApis/externalApi2"
+	      "externalApiResourceName":"projects/PROJECT_ID/locations/LOCATION/externalApis/externalApi2"
 	   },
 	   "attributes":{
-	      "sample-attribute8":{
+	      "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute8":{
 	         "stringValues":{
 	            "values":[
 	               "dependency1"
 	            ]
 	         }
 	      },
-	      "sample-attribute9":{
+	      "projects/PROJECT_ID/locations/LOCATION/attributes/sample-attribute9":{
 	         "stringValues":{
 	            "values":[
 	               "dependency2"

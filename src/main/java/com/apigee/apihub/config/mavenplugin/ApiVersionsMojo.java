@@ -18,6 +18,7 @@ package com.apigee.apihub.config.mavenplugin;
 
 import static java.lang.String.format;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,13 +34,21 @@ import org.json.simple.parser.ParseException;
 import com.apigee.apihub.config.utils.ApiHubClientSingleton;
 import com.apigee.apihub.config.utils.BuildProfile;
 import com.apigee.apihub.config.utils.ConfigReader;
-import com.apigee.apihub.config.utils.FQDNHelper;
+import com.apigee.apihub.config.utils.PluginConstants;
+import com.apigee.apihub.config.utils.PluginUtils;
 import com.apigee.apihub.config.utils.ProtoJsonUtil;
 import com.google.api.client.util.Key;
+import com.google.api.client.util.Strings;
 import com.google.api.gax.rpc.ApiException;
 import com.google.api.gax.rpc.StatusCode.Code;
 import com.google.cloud.apihub.v1.ApiHubClient;
 import com.google.cloud.apihub.v1.ApiName;
+import com.google.cloud.apihub.v1.DeleteVersionRequest;
+import com.google.cloud.apihub.v1.ListApisRequest;
+import com.google.cloud.apihub.v1.ListApisResponse;
+import com.google.cloud.apihub.v1.ListVersionsRequest;
+import com.google.cloud.apihub.v1.ListVersionsResponse;
+import com.google.cloud.apihub.v1.LocationName;
 import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
 import com.google.protobuf.FieldMask;
@@ -57,7 +66,7 @@ public class ApiVersionsMojo extends ApiHubAbstractMojo {
 	public static final String ____ATTENTION_MARKER____ = "************************************************************************";
 
 	enum OPTIONS {
-		none, create, update, delete, sync
+		none, create, update, delete, sync, export
 	}
 
 	OPTIONS buildOption = OPTIONS.none;
@@ -77,6 +86,18 @@ public class ApiVersionsMojo extends ApiHubAbstractMojo {
         public String name;
     }
 	
+	protected String getApiVersionId(String payload) 
+            throws MojoFailureException {
+		Gson gson = new Gson();
+		try {
+			ApiVersion apiVersion = gson.fromJson(payload, ApiVersion.class);
+			String[] parts = apiVersion.name.split("/");
+			String apiVersionId = parts[parts.length - 1];
+			return apiVersionId;
+		} catch (JsonParseException e) {
+		  throw new MojoFailureException(e.getMessage());
+		}
+	}
 	protected String getApiVersionName(String payload) 
             throws MojoFailureException {
 		Gson gson = new Gson();
@@ -126,6 +147,18 @@ public class ApiVersionsMojo extends ApiHubAbstractMojo {
 			if (buildProfile.getConfigDir() == null) {
 				throw new MojoExecutionException("API Confile Dir is missing");
 			}
+			if (!buildOption.equals(OPTIONS.export) && buildProfile.getConfigDir() == null) {
+				throw new MojoExecutionException("API Confile Dir is missing");
+			}
+			if (buildOption.equals(OPTIONS.export) && buildProfile.getConfigExportDir() == null) {
+				throw new MojoExecutionException("Confile Export Dir is missing");
+			}
+			if (buildOption.equals(OPTIONS.export) && buildProfile.getConfigExportDir() != null) {
+				File f = new File(buildProfile.getConfigExportDir());
+				if (!f.exists() || !f.isDirectory()) {
+					throw new MojoExecutionException("Export Dir is not created or is incorrect");
+				}
+			}
 			 
 
 		} catch (IllegalArgumentException e) {
@@ -147,9 +180,14 @@ public class ApiVersionsMojo extends ApiHubAbstractMojo {
 
 		try {
 			init();
-			logger.info(format("Fetching apiVersions.json file from %s directory", buildProfile.getConfigDir()));
-			List<String> apiVersions = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/apiVersions.json");
-			processApiVersions(apiVersions);
+			if(buildOption == OPTIONS.export) {
+				logger.info(format("Exporting apiVersions.json file to %s directory", buildProfile.getConfigExportDir()));
+				exportApiVersions(buildProfile);
+			} else {
+				logger.info(format("Fetching apiVersions.json file from %s directory", buildProfile.getConfigDir()));
+				List<String> apiVersions = ConfigReader.parseConfig(buildProfile.getConfigDir()+"/apiVersions.json");
+				processApiVersions(apiVersions);
+			}
 
 		} catch (MojoFailureException e) {
 			throw e;
@@ -176,16 +214,12 @@ public class ApiVersionsMojo extends ApiHubAbstractMojo {
 					return;
 			}
 			for (String apiVersion : apiVersions) {
-				String apiVersionName = getApiVersionName(apiVersion);
-				String pattern = "^([a-zA-Z0-9-_]+)\\/versions\\/([a-zA-Z0-9-_]+)$"; //{api}/versions/{version}
-				Pattern p = Pattern.compile(pattern);
-				Matcher m = p.matcher(apiVersionName);
+				apiVersion = PluginUtils.replacer(apiVersion, PluginConstants.PATTERN, format("projects/%s/locations/%s", buildProfile.getProjectId(), buildProfile.getLocation()));
+				String apiVersionId = getApiVersionId(apiVersion);
+				String apiVersionName = getApiVersionName(apiVersion); //FQDN
 				if (apiVersionName == null) {
 	        		throw new IllegalArgumentException("Api Version does not have a name");
 	        	}
-				else if(apiVersionName != null && !m.matches()) {
-					throw new IllegalArgumentException(format("Api Version should be in %s format", pattern));
-				}
 				if (doesApiVersionExist(buildProfile, apiVersionName)) {
 					switch (buildOption) {
 						case create:
@@ -194,7 +228,7 @@ public class ApiVersionsMojo extends ApiHubAbstractMojo {
 						case update:
 							logger.info(format("Api Version \"%s\" already exists. Updating.", apiVersionName));
 							//update
-							doUpdate(buildProfile, apiVersionName, apiVersion);
+							doUpdate(buildProfile, apiVersion);
 							break;
 						case delete:
 							logger.info(format("Api Version \"%s\" already exists. Deleting.", apiVersionName));
@@ -207,7 +241,7 @@ public class ApiVersionsMojo extends ApiHubAbstractMojo {
 							doDelete(buildProfile, apiVersionName);
 							logger.info(format("Creating Api Version - %s", apiVersionName));
 							//create
-							doCreate(buildProfile, apiVersionName, apiVersion);
+							doCreate(buildProfile, apiVersionName, apiVersionId, apiVersion);
 							break;
 					}
 				} else {
@@ -217,7 +251,7 @@ public class ApiVersionsMojo extends ApiHubAbstractMojo {
 	                    case update:
 	                    	logger.info(format("Creating Api Version - %s", apiVersionName));
 	                    	//create
-	                    	doCreate(buildProfile, apiVersionName, apiVersion);
+	                    	doCreate(buildProfile, apiVersionName, apiVersionId, apiVersion);
 							break;
 	                    case delete:
                             logger.info(format("Api Version \"%s\" does not exist. Skipping.", apiVersionName));
@@ -231,18 +265,74 @@ public class ApiVersionsMojo extends ApiHubAbstractMojo {
 	}
 	
 	/**
+	 * 
+	 * @param profile
+	 * @throws MojoExecutionException
+	 */
+	public void exportApiVersions(BuildProfile profile) throws MojoExecutionException {
+		ApiHubClient apiHubClient = null;
+		List<String> apiVersionsList = new ArrayList<String>();
+		try {
+			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
+			//Get the list of APIs
+			ListApisRequest request =
+					ListApisRequest.newBuilder()
+						.setParent(LocationName.of(profile.getProjectId(), profile.getLocation()).toString())
+						//.setFilter("display_name=\"foo\"")
+						.setPageSize(PluginConstants.PAGE_SIZE).build();
+			while (true) {
+				ListApisResponse response = apiHubClient.listApisCallable().call(request);
+				for (com.google.cloud.apihub.v1.Api api : response.getApisList()) {
+					//Get the list of API Versions
+					ListVersionsRequest verRequest =
+							ListVersionsRequest.newBuilder()
+								.setParent(api.getName())
+								//.setFilter("display_name=\"API 1\"")
+								.setPageSize(PluginConstants.PAGE_SIZE).build();
+					while (true) {
+						ListVersionsResponse verResponse = apiHubClient.listVersionsCallable().call(verRequest);
+						for (com.google.cloud.apihub.v1.Version version : verResponse.getVersionsList()) {
+							String apiVersionStr = ProtoJsonUtil.toJson(version);
+							apiVersionStr = PluginUtils.replacer(apiVersionStr, PluginConstants.PATTERN1, format("projects/%s/locations/%s", PluginConstants.PROJECT_ID, PluginConstants.LOCATION));
+							apiVersionsList.add(PluginUtils.cleanseResponse(apiVersionStr));
+						}
+						String verNextPageToken = verResponse.getNextPageToken();
+						if (!Strings.isNullOrEmpty(verNextPageToken)) {
+							verRequest = verRequest.toBuilder().setPageToken(verNextPageToken).build();
+					    } else {
+					       break;
+					    }
+					}
+				}
+				String nextPageToken = response.getNextPageToken();
+				if (!Strings.isNullOrEmpty(nextPageToken)) {
+			       request = request.toBuilder().setPageToken(nextPageToken).build();
+			    } else {
+			       break;
+			    }
+		   }
+			PluginUtils.exportToFile(apiVersionsList, profile.getConfigExportDir(), "apiVersions");
+		}catch (Exception e) {
+			throw new RuntimeException(e.getMessage());
+		}
+		finally {
+			apiHubClient.close();
+		}
+	}
+	
+	/**
 	 * Create Api Version
 	 * @param apiVersionName
+	 * @param apiVersionId
 	 * @param apiVersionStr
 	 * @throws MojoExecutionException
 	 */
-	public void doCreate(BuildProfile profile, String apiVersionName, String apiVersionStr) throws MojoExecutionException {
+	public void doCreate(BuildProfile profile, String apiVersionName, String apiVersionId, String apiVersionStr) throws MojoExecutionException {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-			
-			//parse the {api}/versions/{version}
-			String pattern = "^([a-zA-Z0-9-_]+)\\/versions\\/([a-zA-Z0-9-_]+)$";
+			//parse projects/PROJECT_ID/locations/LOCATION/apis/{api}/versions/{version}/specs/{spec} to get api and version
+			String pattern = ".*\\/apis\\/([a-zA-Z0-9-_]+)\\/versions\\/([a-zA-Z0-9-_]+).*";
 			Pattern p = Pattern.compile(pattern);
 			Matcher m = p.matcher(apiVersionName);
 			if(m.matches()) {
@@ -250,33 +340,9 @@ public class ApiVersionsMojo extends ApiHubAbstractMojo {
 				String version = m.group(2);
 				
 				ApiName parent = ApiName.of(profile.getProjectId(), profile.getLocation(), apiName);
-				
-				//replace the name field from {api}/versions/{version} to {version}
-				apiVersionStr = FQDNHelper.replaceFQDNJsonValue("$.name", version, apiVersionStr);
-				
-				//update attributes with FQDN if exist
-				apiVersionStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", apiVersionStr);
-				
-				//update deployments ARRAY with FQDN if exist
-				apiVersionStr =  FQDNHelper.updateFQDNJsonStringArray("$.deployments", format("projects/%s/locations/%s/deployments", profile.getProjectId(), profile.getLocation()), apiVersionStr);
-				
-				//update lifecycle with FQDN if exist
-				apiVersionStr = FQDNHelper.updateFQDNJsonValue("$.lifecycle.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiVersionStr);
-			
-				//update compliance with FQDN if exist
-				apiVersionStr = FQDNHelper.updateFQDNJsonValue("$.compliance.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiVersionStr);
-				
-				//update accreditation with FQDN if exist
-				apiVersionStr = FQDNHelper.updateFQDNJsonValue("$.accreditation.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiVersionStr);
-				
-				//update selectedVersion with FQDN if exist
-				apiVersionStr = FQDNHelper.updateFQDNJsonValue("$.selectedDeployment", format("projects/%s/locations/%s/deployments", profile.getProjectId(), profile.getLocation()),apiVersionStr);
-				
-				logger.debug("after modifying: "+ apiVersionStr);
-				
 				com.google.cloud.apihub.v1.Version apiVersionObj = ProtoJsonUtil.fromJson(apiVersionStr, com.google.cloud.apihub.v1.Version.class);
 				apiHubClient.createVersion(parent, apiVersionObj, version);
-			    logger.info("Create success");
+				logger.info("Create success");
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -289,12 +355,13 @@ public class ApiVersionsMojo extends ApiHubAbstractMojo {
 	 * @param profile
 	 * @param apiVersionName
 	 * @throws MojoExecutionException
-	 */
+	 */	
 	public void doDelete(BuildProfile profile, String apiVersionName) throws MojoExecutionException {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-			apiHubClient.deleteVersion(format("projects/%s/locations/%s/apis/%s", profile.getProjectId(), profile.getLocation(), apiVersionName));
+			DeleteVersionRequest request = DeleteVersionRequest.newBuilder().setName(apiVersionName).setForce(profile.getForceDelete()).build();
+			apiHubClient.deleteVersion(request);
 		    logger.info("Delete success");
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -305,40 +372,13 @@ public class ApiVersionsMojo extends ApiHubAbstractMojo {
 	/**
 	 * Update Api Version
 	 * @param profile
-	 * @param apiVersionName
 	 * @param apiVersionStr
 	 * @throws MojoExecutionException
 	 */
-	public void doUpdate(BuildProfile profile, String apiVersionName, String apiVersionStr) throws MojoExecutionException {
+	public void doUpdate(BuildProfile profile, String apiVersionStr) throws MojoExecutionException {
 		ApiHubClient apiHubClient = null;
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-			
-			//updating the name field in the api object to projects/{project}/locations/{location}/apis/{api}/versions/{version} format as its required by the updateVersion method
-			apiVersionStr = FQDNHelper.updateFQDNJsonValue("$.name", 
-											format("projects/%s/locations/%s/apis", profile.getProjectId(), profile.getLocation()), 
-											apiVersionStr);
-			
-			//update attributes with FQDN if exist
-			apiVersionStr = FQDNHelper.updateFQDNJsonKey(profile, "attributes", "projects/%s/locations/%s/attributes/%s", apiVersionStr);
-
-			//update deployments ARRAY with FQDN if exist
-			apiVersionStr =  FQDNHelper.updateFQDNJsonStringArray("$.deployments", format("projects/%s/locations/%s/deployments", profile.getProjectId(), profile.getLocation()), apiVersionStr);
-			
-			//update lifecycle with FQDN if exist
-			apiVersionStr = FQDNHelper.updateFQDNJsonValue("$.lifecycle.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiVersionStr);
-		
-			//update compliance with FQDN if exist
-			apiVersionStr = FQDNHelper.updateFQDNJsonValue("$.compliance.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiVersionStr);
-			
-			//update accreditation with FQDN if exist
-			apiVersionStr = FQDNHelper.updateFQDNJsonValue("$.accreditation.attribute", format("projects/%s/locations/%s/attributes", profile.getProjectId(), profile.getLocation()),apiVersionStr);
-			
-			//update selectedVersion with FQDN if exist
-			apiVersionStr = FQDNHelper.updateFQDNJsonValue("$.selectedDeployment", format("projects/%s/locations/%s/deployments", profile.getProjectId(), profile.getLocation()),apiVersionStr);
-			
-			logger.debug("after modifying: "+ apiVersionStr);
-			
 			com.google.cloud.apihub.v1.Version apiVersionObj = ProtoJsonUtil.fromJson(apiVersionStr, com.google.cloud.apihub.v1.Version.class);
 			List<String> fieldMaskValues = new ArrayList<>();
 			fieldMaskValues.add("display_name");
@@ -371,7 +411,7 @@ public class ApiVersionsMojo extends ApiHubAbstractMojo {
 		try {
         	logger.info("Checking if Api Version - " +apiVersionName + " exist");
         	ApiHubClient apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
-        	com.google.cloud.apihub.v1.Version apiVersionResponse = apiHubClient.getVersion(format("projects/%s/locations/%s/apis/%s", profile.getProjectId(), profile.getLocation(), apiVersionName));
+        	com.google.cloud.apihub.v1.Version apiVersionResponse = apiHubClient.getVersion(apiVersionName);
         	if(apiVersionResponse == null) 
             	return false;
         }
