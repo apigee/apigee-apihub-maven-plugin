@@ -120,32 +120,31 @@ public class ApisMojo extends ApiHubAbstractMojo {
 
 			logger.debug("Build option " + buildOption.name());
 
-			
-			if (buildProfile.getProjectId() == null) {
-				throw new MojoExecutionException("Apigee API hub Project ID is missing");
+			if (Strings.isNullOrEmpty(buildProfile.getProjectId())) {
+				throw new MojoExecutionException("Apigee API hub Project ID is missing or empty");
 			}
-			if (buildProfile.getLocation() == null) {
-				throw new MojoExecutionException("Apigee API hub Location is missing");
+			if (Strings.isNullOrEmpty(buildProfile.getLocation())) {
+				throw new MojoExecutionException("Apigee API hub Location is missing or empty");
 			}
-			if (buildProfile.getServiceAccountFilePath() == null && buildProfile.getBearer() == null) {
-				throw new MojoExecutionException("Service Account file path or Bearer token is missing");
+			if (Strings.isNullOrEmpty(buildProfile.getServiceAccountFilePath()) && Strings.isNullOrEmpty(buildProfile.getBearer())) {
+				throw new MojoExecutionException("Service Account file path or Bearer token is missing or empty");
 			}
-			if (!buildOption.equals(OPTIONS.export) && buildProfile.getConfigDir() == null) {
-				throw new MojoExecutionException("API Confile Dir is missing");
+			if (!buildOption.equals(OPTIONS.export) && Strings.isNullOrEmpty(buildProfile.getConfigDir())) {
+				throw new MojoExecutionException("API Config Directory is missing");
 			}
-			if (buildOption.equals(OPTIONS.export) && buildProfile.getConfigExportDir() == null) {
-				throw new MojoExecutionException("Confile Export Dir is missing");
+			if (buildOption.equals(OPTIONS.export) && Strings.isNullOrEmpty(buildProfile.getConfigExportDir())) {
+				throw new MojoExecutionException("Config Export Directory is missing");
 			}
-			if (buildOption.equals(OPTIONS.export) && buildProfile.getConfigExportDir() != null) {
+			if (buildOption.equals(OPTIONS.export) && !Strings.isNullOrEmpty(buildProfile.getConfigExportDir())) {
 				File f = new File(buildProfile.getConfigExportDir());
 				if (!f.exists() || !f.isDirectory()) {
-					throw new MojoExecutionException("Export Dir is not created or is incorrect");
+					throw new MojoExecutionException("Config Export Directory is not created or is incorrect");
 				}
 			}
 			 
 
 		} catch (IllegalArgumentException e) {
-			throw new RuntimeException("Invalid apigee.option provided");
+			throw new RuntimeException("Invalid apigee.apihub.config.options provided");
 		} catch (RuntimeException e) {
 			throw e;
 		} 
