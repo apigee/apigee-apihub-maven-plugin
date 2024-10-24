@@ -279,9 +279,6 @@ public class DependenciesMojo extends ApiHubAbstractMojo {
 		}catch (Exception e) {
 			throw new RuntimeException(e.getMessage());
 		}
-		finally {
-			apiHubDependenciesClient.close();
-		}
 	}
 	
 	/**

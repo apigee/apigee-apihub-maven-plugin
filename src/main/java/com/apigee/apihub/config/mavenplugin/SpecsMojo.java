@@ -341,9 +341,6 @@ public class SpecsMojo extends ApiHubAbstractMojo {
 		}catch (Exception e) {
 			throw new RuntimeException(e.getMessage());
 		}
-		finally {
-			apiHubClient.close();
-		}
 	}
 	
 	/**

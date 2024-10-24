@@ -279,9 +279,6 @@ public class AttributesMojo extends ApiHubAbstractMojo {
 		}catch (Exception e) {
 			throw new RuntimeException(e.getMessage());
 		}
-		finally {
-			apiHubClient.close();
-		}
 	}
 	
 	/**

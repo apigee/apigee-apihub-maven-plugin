@@ -312,9 +312,6 @@ public class ApiVersionsMojo extends ApiHubAbstractMojo {
 		}catch (Exception e) {
 			throw new RuntimeException(e.getMessage());
 		}
-		finally {
-			apiHubClient.close();
-		}
 	}
 	
 	/**
