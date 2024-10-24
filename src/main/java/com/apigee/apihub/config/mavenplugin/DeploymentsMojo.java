@@ -278,9 +278,6 @@ public class DeploymentsMojo extends ApiHubAbstractMojo {
 		}catch (Exception e) {
 			throw new RuntimeException(e.getMessage());
 		}
-		finally {
-			apiHubClient.close();
-		}
 	}
 	
 	/**
