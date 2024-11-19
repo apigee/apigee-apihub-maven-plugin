@@ -196,6 +196,7 @@ public class DeploymentsMojo extends ApiHubAbstractMojo {
 					return;
 			}
 			for (String deployment : deployments) {
+				deployment = PluginUtils.replacer(deployment, PluginConstants.PATTERN, format("projects/%s/locations/%s", buildProfile.getProjectId(), buildProfile.getLocation()));
 				String deploymentName = getDeploymentName(deployment);
 				if (deploymentName == null) {
 	        		throw new IllegalArgumentException("Deployment does not have a name");
