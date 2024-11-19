@@ -330,6 +330,10 @@ public class DeploymentsMojo extends ApiHubAbstractMojo {
 		try {
 			apiHubClient = ApiHubClientSingleton.getInstance(profile).getApiHubClient();
 			com.google.cloud.apihub.v1.Deployment deploymentObj = ProtoJsonUtil.fromJson(deploymentStr, com.google.cloud.apihub.v1.Deployment.class);
+			if (deploymentObj != null) {
+				String deploymentName = PluginUtils.replacer(deploymentObj.getName(), PluginConstants.PATTERN1, format("projects/%s/locations/%s", buildProfile.getProjectId(), buildProfile.getLocation()));
+				deploymentObj = com.google.cloud.apihub.v1.Deployment.newBuilder(deploymentObj).setName(deploymentName).build();
+			}
 			List<String> fieldMaskValues = new ArrayList<>();
 			fieldMaskValues.add("display_name");
 			fieldMaskValues.add("description");
